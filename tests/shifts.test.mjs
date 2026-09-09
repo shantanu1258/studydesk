@@ -5,6 +5,7 @@ import {
   DEFAULT_SHIFTS,
 } from "../src/config/constants.ts";
 import {
+  demoOccupiesShift,
   labelConfiguredShifts,
   memberOccupiesShift,
   normalizeShifts,
@@ -40,6 +41,12 @@ test("a Full Day member occupies the seat in Morning and Evening", () => {
   const member = { active: true, shift: "Full Day" };
   assert.equal(memberOccupiesShift(member, "Morning", DEFAULT_SHIFTS), true);
   assert.equal(memberOccupiesShift(member, "Evening", DEFAULT_SHIFTS), true);
+});
+
+test("a demo seat follows the same overlapping-shift rules", () => {
+  const demo = { id: "demo-one", seat: "A-01", shift: "Full Day" };
+  assert.equal(demoOccupiesShift(demo, "Morning", DEFAULT_SHIFTS), true);
+  assert.equal(demoOccupiesShift(demo, "Evening", DEFAULT_SHIFTS), true);
 });
 
 test("a blank all-day plan still overlaps every timed shift", () => {

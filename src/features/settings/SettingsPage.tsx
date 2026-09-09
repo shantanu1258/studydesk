@@ -5,6 +5,7 @@ import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
 import {
   DEFAULT_DAILY_SHIFT,
+  DEFAULT_MONTHLY_FEE,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_SECONDARY_COLOR,
   SHIFT_TYPE_OPTIONS,
@@ -40,9 +41,10 @@ import {
 import { normalizeColor } from "../../utils/theme";
 import { DataBackupCard } from "./DataBackupCard";
 
-type SeatDraft = Omit<SeatSection, "start" | "end"> & {
+type SeatDraft = Omit<SeatSection, "start" | "end" | "defaultFee"> & {
   start: number | string;
   end: number | string;
+  defaultFee: number | string;
 };
 const findSeatConflict = (data: WorkspaceData, shifts: Shift[]) => {
   const active = data.members.filter((member) => member.active);
@@ -54,6 +56,31 @@ const findSeatConflict = (data: WorkspaceData, shifts: Shift[]) => {
       )
         return [active[first], active[second]];
   return null;
+};
+
+const findDemoConflict = (data: WorkspaceData, shifts: Shift[]) => {
+  const active = data.members.filter((member) => member.active);
+  for (const demo of data.demoSeats) {
+    const member = active.find(
+      (item) =>
+        item.seat === demo.seat &&
+        shiftsOverlap(shifts, item.shift, demo.shift),
+    );
+    if (member)
+      return `${demo.seat} is assigned to ${member.name} and also marked for demo in an overlapping shift.`;
+  }
+  for (let first = 0; first < data.demoSeats.length; first += 1)
+    for (let second = first + 1; second < data.demoSeats.length; second += 1)
+      if (
+        data.demoSeats[first].seat === data.demoSeats[second].seat &&
+        shiftsOverlap(
+          shifts,
+          data.demoSeats[first].shift,
+          data.demoSeats[second].shift,
+        )
+      )
+        return `${data.demoSeats[first].seat} has overlapping demo shifts. Stop one demo before changing the timings.`;
+  return "";
 };
 
 interface Props {
@@ -170,6 +197,7 @@ export function SettingsPage({
         prefix,
         start: end + 1,
         end: end + 10,
+        defaultFee: DEFAULT_MONTHLY_FEE,
       },
     ]);
     setSeatError("");
@@ -196,6 +224,18 @@ export function SettingsPage({
       );
       return;
     }
+    const sectionSeats = new Set(
+      sectionSeatCodes({
+        ...section,
+        start: Number(section.start),
+        end: Number(section.end),
+      }),
+    );
+    const demo = data.demoSeats.find((item) => sectionSeats.has(item.seat));
+    if (demo) {
+      setSeatError(`${demo.seat} is in demo use. Stop that demo first.`);
+      return;
+    }
     setSeatDrafts((current) =>
       current.filter((item) => item.id !== section.id),
     );
@@ -208,6 +248,7 @@ export function SettingsPage({
         prefix: item.prefix.trim().toUpperCase(),
         start: Number(item.start),
         end: Number(item.end),
+        defaultFee: Number(item.defaultFee),
       }))
       .sort((a, b) => a.start - b.start);
     if (
@@ -219,11 +260,13 @@ export function SettingsPage({
           !Number.isInteger(item.end) ||
           item.start < 1 ||
           item.end < item.start ||
-          item.end > 999,
+          item.end > 999 ||
+          !Number.isFinite(item.defaultFee) ||
+          item.defaultFee < 0,
       )
     ) {
       setSeatError(
-        "Each section needs a name, a 1–3 character prefix, and a valid range from 1 to 999.",
+        "Each section needs a name, a 1–3 character prefix, a valid range from 1 to 999, and a default fee of zero or more.",
       );
       return;
     }
@@ -250,6 +293,15 @@ export function SettingsPage({
     if (missing) {
       setSeatError(
         `${missing.name} is using ${missing.seat}, outside these ranges. Reassign the member first.`,
+      );
+      return;
+    }
+    const missingDemo = data.demoSeats.find(
+      (demo) => !available.has(demo.seat),
+    );
+    if (missingDemo) {
+      setSeatError(
+        `${missingDemo.seat} is in demo use outside these ranges. Stop that demo first.`,
       );
       return;
     }
@@ -297,6 +349,15 @@ export function SettingsPage({
     if (assigned) {
       setShiftError(
         `${item.name} has ${assigned} active members. Move them before deleting this shift.`,
+      );
+      return;
+    }
+    const demos = data.demoSeats.filter(
+      (demo) => demo.shift === item.name || demo.shift === saved?.name,
+    ).length;
+    if (demos) {
+      setShiftError(
+        `${item.name} has ${demos} demo ${demos === 1 ? "seat" : "seats"}. Stop them before deleting this shift.`,
       );
       return;
     }
@@ -357,6 +418,10 @@ export function SettingsPage({
         ...member,
         shift: renamed.get(member.shift) || member.shift,
       })),
+      demoSeats: data.demoSeats.map((demo) => ({
+        ...demo,
+        shift: renamed.get(demo.shift) || demo.shift,
+      })),
     };
     const conflict = findSeatConflict(projected, cleaned);
     if (conflict) {
@@ -365,12 +430,20 @@ export function SettingsPage({
       );
       return;
     }
+    const demoConflict = findDemoConflict(projected, cleaned);
+    if (demoConflict) {
+      setShiftError(demoConflict);
+      return;
+    }
     setShiftError("");
     await saveAction(
       "shifts",
       (next) => {
         next.members.forEach((member) => {
           member.shift = renamed.get(member.shift) || member.shift;
+        });
+        next.demoSeats.forEach((demo) => {
+          demo.shift = renamed.get(demo.shift) || demo.shift;
         });
         next.settings.shifts = cleaned;
       },
@@ -385,6 +458,14 @@ export function SettingsPage({
         next.members.forEach((member) => {
           member.shift = "Daily";
         });
+        next.demoSeats = [
+          ...new Map(
+            next.demoSeats.map((demo) => [
+              demo.seat,
+              { ...demo, shift: "Daily" },
+            ]),
+          ).values(),
+        ];
       },
       "Daily-only plan enabled",
     );
@@ -406,6 +487,15 @@ export function SettingsPage({
       );
       return;
     }
+    const memberDemoConflict = data.demoSeats.find((demo) =>
+      used.has(demo.seat),
+    );
+    if (memberDemoConflict) {
+      setShiftError(
+        `${memberDemoConflict.seat} is assigned to a member and also in demo use. Stop that demo before switching to Daily.`,
+      );
+      return;
+    }
     if (data.members.some((member) => member.active)) setConfirmDaily(true);
     else void enableDaily();
   }
@@ -423,7 +513,7 @@ export function SettingsPage({
     }
   }
   async function removeUser() {
-    if (!removeTarget) return;
+    if (!removeTarget || !data.settings.isFounder) return;
     const removed = await team.removeUser(removeTarget);
     if (removed) {
       showToast(`${removeTarget.name} removed from the library`);
@@ -568,7 +658,7 @@ export function SettingsPage({
               className="rounded-2xl border border-slate-200 p-4"
               key={section.id}
             >
-              <div className="grid gap-3 sm:grid-cols-[1fr_90px_90px_90px]">
+              <div className="grid gap-3 sm:grid-cols-[1fr_90px_90px_90px_130px]">
                 <label>
                   Section name
                   <input
@@ -612,6 +702,17 @@ export function SettingsPage({
                     }
                   />
                 </label>
+                <label>
+                  Default fee (₹)
+                  <input
+                    type="number"
+                    min={0}
+                    value={section.defaultFee}
+                    onChange={(event) =>
+                      changeSeat(section.id, "defaultFee", event.target.value)
+                    }
+                  />
+                </label>
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-sm font-bold text-slate-500">
@@ -631,7 +732,10 @@ export function SettingsPage({
             </div>
           ))}
         </div>
-        <p className="helper mt-4">Example: A-01–A-20 and B-21–B-40.</p>
+        <p className="helper mt-4">
+          Example: A-01–A-20 at ₹800 and B-21–B-40 at ₹1,200. The matching rate
+          is suggested during admission.
+        </p>
         <p className="field-error mt-2">{seatError}</p>
         <Button
           className="mt-2 w-full sm:w-auto"
@@ -752,7 +856,7 @@ export function SettingsPage({
           <div className="section-title">
             <div>
               <h2>Library team</h2>
-              <p>Core admin and admins have the same workspace access</p>
+              <p>Only the Core admin can remove another admin</p>
             </div>
             <Button
               disabled={team.busy}
@@ -801,7 +905,7 @@ export function SettingsPage({
                       <StatusPill tone="neutral">
                         Admin{member.id === user.id ? " · You" : ""}
                       </StatusPill>
-                      {member.id !== user.id && (
+                      {data.settings.isFounder && member.id !== user.id && (
                         <Button
                           variant="danger"
                           onClick={() => setRemoveTarget(member)}

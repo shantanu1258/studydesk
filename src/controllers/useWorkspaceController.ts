@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { workspaceRepository } from "../repositories/workspaceRepository";
 import type {
   AppUser,
-  ModalState,
   ToastMessage,
   ToastTone,
   WorkspaceData,
@@ -19,7 +18,6 @@ export function useWorkspaceController(user: AppUser) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [shift, setShift] = useState("Morning");
   const [query, setQuery] = useState("");
-  const [modal, setModal] = useState<ModalState | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -124,8 +122,6 @@ export function useWorkspaceController(user: AppUser) {
     setShift,
     query,
     setQuery,
-    modal,
-    setModal,
     toast,
     dismissToast,
     showToast,

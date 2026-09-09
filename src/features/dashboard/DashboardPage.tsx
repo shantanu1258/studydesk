@@ -24,6 +24,7 @@ import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 import {
   configuredShifts,
+  demoOccupiesShift,
   memberOccupiesShift,
   shiftTiming,
 } from "../../utils/shifts";
@@ -74,6 +75,9 @@ function StatCard({
 
 type DashboardModal = "seats" | "dues" | null;
 
+const percentOf = (count: number, total: number) =>
+  total ? Math.round((count / total) * 1000) / 10 : 0;
+
 export function DashboardPage({
   data,
   shift,
@@ -90,13 +94,27 @@ export function DashboardPage({
   const [dashboardModal, setDashboardModal] = useState<DashboardModal>(null);
   const [dueSearch, setDueSearch] = useState("");
   const active = data.members.filter((member) => member.active);
-  const occupied = new Set(
+  const occupiedSeats = new Set(
     active
       .filter((member) =>
         memberOccupiesShift(member, shift, data.settings.shifts),
       )
       .map((member) => member.seat),
-  ).size;
+  );
+  const demoSeatCodes = new Set(
+    data.demoSeats
+      .filter((demo) => demoOccupiesShift(demo, shift, data.settings.shifts))
+      .map((demo) => demo.seat),
+  );
+  const inUseSeats = new Set([...occupiedSeats, ...demoSeatCodes]);
+  const occupied = occupiedSeats.size;
+  const demoCount = [...demoSeatCodes].filter(
+    (seat) => !occupiedSeats.has(seat),
+  ).length;
+  const inUse = inUseSeats.size;
+  const occupiedPercent = percentOf(occupied, data.settings.seatCount);
+  const demoPercent = percentOf(demoCount, data.settings.seatCount);
+  const inUsePercent = percentOf(inUse, data.settings.seatCount);
   const month = localDate().slice(0, 7);
   const monthlyFees = data.fees.filter((fee) => fee.date.startsWith(month));
   const collected = monthlyFees.reduce(
@@ -125,19 +143,33 @@ export function DashboardPage({
     ]),
   );
   const shiftOccupancy = configuredShifts(data.settings).map((option) => {
-    const count = new Set(
+    const memberSeats = new Set(
       active
         .filter((member) =>
           memberOccupiesShift(member, option.name, data.settings.shifts),
         )
         .map((member) => member.seat),
-    ).size;
+    );
+    const demoSeats = new Set(
+      data.demoSeats
+        .filter((demo) =>
+          demoOccupiesShift(demo, option.name, data.settings.shifts),
+        )
+        .map((demo) => demo.seat),
+    );
+    const count = new Set([...memberSeats, ...demoSeats]).size;
+    const memberCount = memberSeats.size;
+    const demoCount = [...demoSeats].filter(
+      (seat) => !memberSeats.has(seat),
+    ).length;
     return {
       ...option,
       count,
-      percent: data.settings.seatCount
-        ? Math.round((count / data.settings.seatCount) * 100)
-        : 0,
+      memberCount,
+      demoCount,
+      memberPercent: percentOf(memberCount, data.settings.seatCount),
+      demoPercent: percentOf(demoCount, data.settings.seatCount),
+      percent: percentOf(count, data.settings.seatCount),
     };
   });
   const activities = [
@@ -157,10 +189,6 @@ export function DashboardPage({
         kind: "fee",
       })),
   ].slice(0, 4);
-  const percent = data.settings.seatCount
-    ? Math.round((occupied / data.settings.seatCount) * 100)
-    : 0;
-
   return (
     <>
       <section className="grid gap-3 min-[380px]:grid-cols-2 xl:grid-cols-4">
@@ -175,9 +203,9 @@ export function DashboardPage({
         <StatCard
           tone="green"
           icon={<SeatIcon className="size-5" />}
-          label="Seats occupied"
-          value={`${occupied} / ${data.settings.seatCount}`}
-          note={`${percent}% in ${shift.toLowerCase()}`}
+          label="Seats in use"
+          value={`${inUse} / ${data.settings.seatCount}`}
+          note={`${occupied} occupied · ${demoCount} demo`}
           onClick={() => setDashboardModal("seats")}
         />
         <StatCard
@@ -222,8 +250,9 @@ export function DashboardPage({
             </div>
             <ProgressIndicator
               label="Seat occupancy"
-              value={`${occupied}/${data.settings.seatCount} (${percent}%)`}
-              percent={percent}
+              value={`${inUse}/${data.settings.seatCount}${demoCount ? ` (${demoCount} demo)` : ""} · ${inUsePercent}%`}
+              percent={occupiedPercent}
+              demoPercent={demoPercent}
               tone="positive"
             />
           </div>
@@ -316,10 +345,30 @@ export function DashboardPage({
                   </strong>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-emerald-600 transition-[width]"
-                    style={{ width: `${Math.min(option.percent, 100)}%` }}
-                  />
+                  <div className="flex h-full">
+                    <div
+                      className="h-full bg-emerald-600 transition-[width]"
+                      style={{
+                        width: `${Math.min(option.memberPercent, 100)}%`,
+                      }}
+                    />
+                    <div
+                      className="h-full bg-[var(--status-demo)] transition-[width]"
+                      style={{
+                        width: `${Math.min(option.demoPercent, 100 - option.memberPercent)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <i className="size-2 rounded-full bg-[var(--brand)]" />
+                    {option.memberCount} occupied ({option.memberPercent}%)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <i className="size-2 rounded-full bg-[var(--status-demo)]" />
+                    {option.demoCount} demo ({option.demoPercent}%)
+                  </span>
                 </div>
               </div>
             ))}

@@ -1,6 +1,7 @@
 import {
   DEFAULT_ATTENDANCE_ENABLED,
   DEFAULT_FEE_COLLECTION,
+  DEFAULT_MONTHLY_FEE,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_SECONDARY_COLOR,
   DEFAULT_SHIFTS,
@@ -61,6 +62,7 @@ export function seedData(
           prefix: "A",
           start: 1,
           end: 24,
+          defaultFee: DEFAULT_MONTHLY_FEE,
         },
       ],
       library,
@@ -118,5 +120,6 @@ export function seedData(
             out: "",
           },
         ],
+    demoSeats: [],
   };
 }

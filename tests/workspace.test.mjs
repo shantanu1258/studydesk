@@ -25,6 +25,7 @@ function workspace() {
           prefix: "A",
           start: 1,
           end: 24,
+          defaultFee: 800,
         },
       ],
       shifts: structuredClone(DEFAULT_SHIFTS),
@@ -64,6 +65,7 @@ function workspace() {
       },
     ],
     attendance: [],
+    demoSeats: [],
   };
 }
 
@@ -75,7 +77,34 @@ test("unchanged workspaces produce an empty database change set", () => {
   assert.deepEqual(changes.p_members, []);
   assert.deepEqual(changes.p_payments, []);
   assert.deepEqual(changes.p_attendance, []);
+  assert.deepEqual(changes.p_demo_seats, []);
   assert.deepEqual(changes.p_deleted_member_ids, []);
+  assert.deepEqual(changes.p_deleted_demo_seat_ids, []);
+});
+
+test("demo seat starts and stops are included in database changes", () => {
+  const previous = workspace();
+  const next = structuredClone(previous);
+  next.demoSeats.push({
+    id: "c4d8d1fe-ae2a-4430-830d-fda511b20f4f",
+    seat: "A-02",
+    shift: "Morning",
+  });
+
+  const started = buildWorkspaceChanges(previous, next);
+  assert.deepEqual(started.p_demo_seats, [
+    {
+      id: "c4d8d1fe-ae2a-4430-830d-fda511b20f4f",
+      library_id: libraryId,
+      seat_code: "A-02",
+      shift: "Morning",
+    },
+  ]);
+
+  const stopped = buildWorkspaceChanges(next, previous);
+  assert.deepEqual(stopped.p_deleted_demo_seat_ids, [
+    "c4d8d1fe-ae2a-4430-830d-fda511b20f4f",
+  ]);
 });
 
 test("only changed and newly added records are sent", () => {
@@ -157,6 +186,7 @@ test("settings and removed records are represented explicitly", () => {
         prefix: "A",
         start: 1,
         end: 24,
+        defaultFee: 800,
       },
     ],
   });

@@ -110,6 +110,9 @@ export function DataBackupCard({
       next.members = restored.members;
       next.fees = restored.fees;
       next.attendance = restored.attendance;
+      next.demoSeats = Array.isArray(restored.demoSeats)
+        ? restored.demoSeats
+        : [];
     }, "Backup restored");
     if (saved) setPending(null);
     return saved;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  defaultFeeForSeat,
   normalizeSeatSections,
   seatCodes,
   seatCountFromSections,
@@ -8,7 +9,14 @@ import {
 
 test("existing seat count and prefix become one compatible section", () => {
   assert.deepEqual(normalizeSeatSections(undefined, 3, "Q"), [
-    { id: "main-section", name: "Main section", prefix: "Q", start: 1, end: 3 },
+    {
+      id: "main-section",
+      name: "Main section",
+      prefix: "Q",
+      start: 1,
+      end: 3,
+      defaultFee: 800,
+    },
   ]);
 });
 
@@ -24,4 +32,31 @@ test("continuous section ranges generate the requested seat codes", () => {
   assert.equal(seats[20], "B-21");
   assert.equal(seats.at(-1), "B-40");
   assert.equal(seatCountFromSections(sections), 40);
+});
+
+test("seat ranges provide their configured admission rate", () => {
+  const settings = {
+    seatSections: [
+      {
+        id: "a",
+        name: "Standard",
+        prefix: "A",
+        start: 1,
+        end: 10,
+        defaultFee: 800,
+      },
+      {
+        id: "b",
+        name: "Premium",
+        prefix: "B",
+        start: 11,
+        end: 20,
+        defaultFee: 1200,
+      },
+    ],
+  };
+
+  assert.equal(defaultFeeForSeat(settings, "A-04"), 800);
+  assert.equal(defaultFeeForSeat(settings, "B-15"), 1200);
+  assert.equal(defaultFeeForSeat(settings, "C-01"), 800);
 });

@@ -73,7 +73,7 @@ Acceptance test:
 
 ## 6. Member identity and lifecycle
 
-- [x] Treat normalized name plus phone number as the member identity within a library.
+- [x] Treat the normalized phone number as the unique member identity within a library while allowing name corrections.
 - [x] Block a second active record for the same person.
 - [x] Offer to reactivate a matching deactivated member with a new seat, shift, fee, and plan.
 - [x] Rename removal to deactivation and preserve all history.
@@ -81,12 +81,31 @@ Acceptance test:
 
 Acceptance test:
 
-1. Try adding the same active name and phone; confirm the duplicate is blocked.
+1. Try adding the same phone with either the same or a different name; confirm the duplicate is identified and the active member's seat is shown.
 2. Deactivate the member and confirm their seat becomes available while fees remain.
 3. Show Deactivated members, open the profile, and reactivate with a different seat.
 4. Confirm only one record exists for that identity and the prior payment archive remains attached.
 
-## 7. Overview tiles
+## 7. Demo seats and payment safeguards
+
+- [x] Let an admin start or stop a persistent demo on an available seat for the selected shift.
+- [x] Treat demo seats as unavailable in overlapping shifts and clear the demo when admitting a member there.
+- [x] Show every member's fee history, count, and collected total from the profile.
+- [x] Warn before recording or correcting a payment whose covered period overlaps another payment for that member.
+- [x] Permit older payment corrections with an explicit review step while keeping the deletion window limited.
+- [x] Restrict admin removal to the Core admin in both the interface and database.
+
+Acceptance test:
+
+1. Start a demo in one shift, reload, and confirm every admin sees the teal demo seat.
+2. Open an overlapping shift and confirm the same physical seat is unavailable there.
+3. Admit a member into the demo seat and confirm the demo state clears.
+4. Open a member profile and verify fee count, total, history, and edit actions.
+5. Add an overlapping covered period and confirm the warning names the existing payment.
+6. Edit an older payment and confirm the extra review appears before saving.
+7. Confirm a regular admin cannot remove another admin, including through a direct database request.
+
+## 8. Overview tiles
 
 - [x] Give each tile a light status colour with a darker border.
 - [x] Restore the icons on mobile.
@@ -98,7 +117,7 @@ Acceptance test:
 2. Confirm each icon is visible and each colour remains readable in bright and dim screens.
 3. Confirm long currency values do not overflow.
 
-## 8. Shift presets
+## 9. Shift presets
 
 - [x] Replace free-form names with Morning, Afternoon, Evening, Full Day, and Hour presets.
 - [x] Permit one of each named day-part but multiple Hour shifts.
@@ -113,7 +132,7 @@ Acceptance test:
 3. Change an Hour time and confirm assigned members follow the renamed shift.
 4. Confirm a Full Day member blocks the same seat in all overlapping shifts.
 
-## 9. Optional attendance
+## 10. Optional attendance
 
 - [x] Make attendance disabled by default.
 - [x] Hide it from navigation when disabled without deleting historical records.
@@ -133,4 +152,4 @@ Acceptance test:
 - [ ] Verify install-as-app behavior.
 - [x] Verify production build.
 - [ ] Verify mobile/desktop navigation with the owner.
-- [ ] Recheck seat conflicts, payment correction limits, backups, and logout confirmation.
+- [ ] Recheck member/demo seat conflicts, payment overlap warnings and corrections, backups, and logout confirmation.

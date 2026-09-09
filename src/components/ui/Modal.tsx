@@ -1,6 +1,140 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Button } from "./Button";
 import { CloseIcon } from "./Icons";
+
+const MODAL_SESSION_KEY = "__studydeskModalSession";
+const MODAL_DEPTH_KEY = "__studydeskModalDepth";
+
+interface ModalRegistration {
+  id: symbol;
+  close: () => void;
+}
+
+type RegisterModal = (close: () => void) => () => void;
+
+const ModalHistoryContext = createContext<RegisterModal | null>(null);
+
+const historyObject = () =>
+  history.state && typeof history.state === "object" ? history.state : {};
+
+const historyDepth = (session: string) =>
+  history.state?.[MODAL_SESSION_KEY] === session
+    ? Number(history.state?.[MODAL_DEPTH_KEY]) || 0
+    : 0;
+
+export function ModalHistoryProvider({ children }: { children: ReactNode }) {
+  const session = useRef(
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const registrations = useRef<ModalRegistration[]>([]);
+  const currentDepth = useRef(0);
+  const traversalTarget = useRef<number | null>(null);
+  const syncQueued = useRef(false);
+  const reconcileRef = useRef<() => void>(() => undefined);
+
+  const scheduleReconcile = useCallback(() => {
+    if (syncQueued.current) return;
+    syncQueued.current = true;
+    queueMicrotask(() => {
+      syncQueued.current = false;
+      reconcileRef.current();
+    });
+  }, []);
+
+  reconcileRef.current = () => {
+    if (traversalTarget.current !== null) return;
+    const actualDepth = historyDepth(session.current);
+    const desiredDepth = registrations.current.length;
+    currentDepth.current = actualDepth;
+
+    if (desiredDepth > actualDepth) {
+      for (let depth = actualDepth + 1; depth <= desiredDepth; depth += 1)
+        history.pushState(
+          {
+            ...historyObject(),
+            [MODAL_SESSION_KEY]: session.current,
+            [MODAL_DEPTH_KEY]: depth,
+          },
+          "",
+          location.href,
+        );
+      currentDepth.current = desiredDepth;
+      return;
+    }
+
+    if (desiredDepth < actualDepth) {
+      traversalTarget.current = desiredDepth;
+      history.go(desiredDepth - actualDepth);
+    }
+  };
+
+  const register = useCallback<RegisterModal>(
+    (close) => {
+      const registration = { id: Symbol("modal"), close };
+      registrations.current.push(registration);
+      scheduleReconcile();
+      return () => {
+        registrations.current = registrations.current.filter(
+          (item) => item.id !== registration.id,
+        );
+        scheduleReconcile();
+      };
+    },
+    [scheduleReconcile],
+  );
+
+  useEffect(() => {
+    const handleBack = () => {
+      const previousDepth = currentDepth.current;
+      const nextDepth = historyDepth(session.current);
+      currentDepth.current = nextDepth;
+
+      if (traversalTarget.current !== null) {
+        traversalTarget.current = null;
+        scheduleReconcile();
+        return;
+      }
+
+      if (nextDepth < previousDepth) {
+        const closing = registrations.current
+          .slice(
+            Math.max(
+              0,
+              registrations.current.length - (previousDepth - nextDepth),
+            ),
+          )
+          .reverse();
+        closing.forEach((registration) => registration.close());
+        return;
+      }
+
+      if (nextDepth > previousDepth && !registrations.current.length) {
+        traversalTarget.current = 0;
+        history.go(-nextDepth);
+        return;
+      }
+
+      scheduleReconcile();
+    };
+    addEventListener("popstate", handleBack);
+    return () => removeEventListener("popstate", handleBack);
+  }, [scheduleReconcile]);
+
+  return (
+    <ModalHistoryContext.Provider value={register}>
+      {children}
+    </ModalHistoryContext.Provider>
+  );
+}
 
 interface ModalProps {
   children: ReactNode;
@@ -19,6 +153,13 @@ export function Modal({
   closeOnBackdrop = true,
   fixedLayout = false,
 }: ModalProps) {
+  const register = useContext(ModalHistoryContext);
+  const closeRef = useRef(onClose);
+  useLayoutEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+  useLayoutEffect(() => register?.(() => closeRef.current()), [register]);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) =>
       event.key === "Escape" && onClose();

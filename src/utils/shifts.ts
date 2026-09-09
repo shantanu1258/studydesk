@@ -2,6 +2,7 @@ import { DEFAULT_SHIFTS, SHIFT_PRESETS } from "../config/constants";
 import type {
   LibrarySettings,
   Member,
+  SeatDemo,
   Shift,
   ShiftType,
 } from "../types/domain";
@@ -112,6 +113,12 @@ export const memberOccupiesShift = (
   selectedShift: string,
   shifts: Shift[],
 ) => member.active && shiftsOverlap(shifts, member.shift, selectedShift);
+
+export const demoOccupiesShift = (
+  demo: SeatDemo,
+  selectedShift: string,
+  shifts: Shift[],
+) => shiftsOverlap(shifts, demo.shift, selectedShift);
 
 export const shiftTiming = (shift: Shift) =>
   shift.start && shift.end ? `${shift.start}–${shift.end}` : "All day";

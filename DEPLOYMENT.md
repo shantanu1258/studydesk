@@ -6,7 +6,7 @@ StudyDesk is a Vite-built static React frontend backed by Supabase. There is no 
 
 1. Sign in at [supabase.com](https://supabase.com) and create a new project.
 2. Choose the region closest to the library and save the database password somewhere private.
-3. Open **SQL Editor**, create a query, and run the files in `supabase/migrations/` in number order. Existing projects should run every migration they have not applied yet, including `003_profile_photos.sql`.
+3. Open **SQL Editor**, create a query, and run the files in `supabase/migrations/` in number order. Existing projects should run every migration they have not applied yet, including `004_demo_seats_and_fee_controls.sql`.
 4. Open **Project Settings → API** and copy:
    - Project URL
    - Publishable key (a legacy `anon` key also works)
@@ -59,7 +59,7 @@ Cloudflare will provide a free `pages.dev` address. Opening that address should 
 3. Confirm the email if prompted, then log in.
 4. Add one member, record attendance, refresh the page, and confirm the records remain.
 5. In **Settings → Library team**, create an invitation code. Use another email address to join and confirm both accounts see the same library.
-6. Confirm the founding owner is labelled protected and cannot be removed.
+6. Confirm the first account is labelled **Core admin**, only it can remove another admin, and it cannot be removed.
 7. Log out and confirm the workspace is no longer visible.
 8. Select **Forgot password?**, open the emailed reset link, choose a new password, and log in with it.
 9. On Android, open the site in Chrome and choose **Install app** when prompted.

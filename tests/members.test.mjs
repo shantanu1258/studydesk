@@ -1,44 +1,71 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  findMemberByIdentity,
+  findMemberByPhone,
+  findOverlappingPayment,
   memberStatus,
-  normalizeMemberName,
-  sameMemberIdentity,
+  paymentPeriodsOverlap,
+  sameMemberPhone,
 } from "../src/utils/members.ts";
 import { localDate } from "../src/utils/format.ts";
 
-test("member identity ignores name case and repeated spaces", () => {
-  assert.equal(normalizeMemberName("  Riya   Mehta "), "riya mehta");
+test("member phone identity does not depend on the member name", () => {
   assert.equal(
-    sameMemberIdentity(
-      { name: "Riya Mehta", phone: "9876543210" },
-      "riya   mehta",
-      "9876543210",
-    ),
+    sameMemberPhone({ name: "Riya Mehta", phone: "9876543210" }, "9876543210"),
     true,
   );
 });
 
-test("member identity still requires the same phone number", () => {
+test("different phone numbers belong to different members", () => {
   assert.equal(
-    sameMemberIdentity(
-      { name: "Riya Mehta", phone: "9876543210" },
-      "Riya Mehta",
-      "9999999999",
+    sameMemberPhone({ name: "Riya Mehta", phone: "9876543210" }, "9999999999"),
+    false,
+  );
+});
+
+test("phone lookup can exclude the record whose name is being edited", () => {
+  const members = [{ id: "one", name: "Riya Mehta", phone: "9876543210" }];
+  assert.equal(findMemberByPhone(members, "9876543210")?.id, "one");
+  assert.equal(findMemberByPhone(members, "9876543210", "one"), undefined);
+});
+
+test("payment periods warn only when their covered dates overlap", () => {
+  assert.equal(
+    paymentPeriodsOverlap(
+      "2026-09-01",
+      "2026-10-01",
+      "2026-09-15",
+      "2026-10-15",
+    ),
+    true,
+  );
+  assert.equal(
+    paymentPeriodsOverlap(
+      "2026-09-01",
+      "2026-10-01",
+      "2026-10-01",
+      "2026-11-01",
     ),
     false,
   );
 });
 
-test("identity lookup can exclude the record being edited", () => {
-  const members = [{ id: "one", name: "Riya Mehta", phone: "9876543210" }];
+test("overlapping payment lookup stays within one member", () => {
+  const payments = [
+    {
+      id: "payment-one",
+      memberId: "member-one",
+      periodStart: "2026-09-01",
+      periodEnd: "2026-10-01",
+    },
+  ];
   assert.equal(
-    findMemberByIdentity(members, "Riya Mehta", "9876543210")?.id,
-    "one",
+    findOverlappingPayment(payments, "member-one", "2026-09-10", "2026-10-10")
+      ?.id,
+    "payment-one",
   );
   assert.equal(
-    findMemberByIdentity(members, "Riya Mehta", "9876543210", "one"),
+    findOverlappingPayment(payments, "member-two", "2026-09-10", "2026-10-10"),
     undefined,
   );
 });

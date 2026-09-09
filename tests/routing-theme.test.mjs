@@ -8,6 +8,7 @@ const read = (path) =>
 const packageJson = JSON.parse(read("package.json"));
 const main = read("src/main.tsx");
 const workspace = read("src/components/layout/WorkspaceShell.tsx");
+const modal = read("src/components/ui/Modal.tsx");
 const header = read("src/components/layout/PageHeader.tsx");
 const theme = read("src/context/ThemeContext.tsx");
 const index = read("index.html");
@@ -36,6 +37,21 @@ test("search close returns through browser history with a direct-load fallback",
     workspace,
     /navigate\(VIEW_PATHS\.overview, \{ replace: true \}\)/,
   );
+});
+
+test("the shared modal wrapper closes every modal through browser history", () => {
+  assert.match(main, /<ModalHistoryProvider>/);
+  assert.match(modal, /history\.pushState/);
+  assert.match(modal, /addEventListener\("popstate", handleBack\)/);
+  assert.match(modal, /registration\.close\(\)/);
+  assert.match(modal, /registrations\.current\.length/);
+  assert.match(workspace, /workspaceModalStack/);
+  assert.match(
+    workspace,
+    /const workspaceModal = workspaceModalStack\.at\(-1\)/,
+  );
+  assert.match(workspace, /sameModal\(stack\.at\(-2\), next\)/);
+  assert.match(workspace, /setModal=\{setWorkspaceModal\}/);
 });
 
 test("light mode is the default and an explicit choice persists", () => {

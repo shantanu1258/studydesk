@@ -17,6 +17,7 @@ import type {
   Member,
   Payment,
   PaymentMode,
+  SeatDemo,
   WorkspaceChangeSet,
   WorkspaceData,
 } from "../types/domain";
@@ -97,6 +98,13 @@ const attendanceToRow = (record: AttendanceRecord, libraryId: string) => ({
   check_out: record.out || null,
 });
 
+const demoSeatToRow = (demo: SeatDemo, libraryId: string) => ({
+  id: demo.id,
+  library_id: libraryId,
+  seat_code: demo.seat,
+  shift: demo.shift,
+});
+
 const rowToMember = (row: DbRow): Member => ({
   id: row.id,
   name: row.name,
@@ -136,6 +144,12 @@ const rowToAttendance = (row: DbRow): AttendanceRecord => ({
   out: row.check_out?.slice(0, 5) || "",
 });
 
+const rowToDemoSeat = (row: DbRow): SeatDemo => ({
+  id: row.id,
+  seat: row.seat_code,
+  shift: row.shift,
+});
+
 export const isDemoUser = (user: AppUser) =>
   user.id === DEMO_USER.id || user.storage === "demo";
 
@@ -168,6 +182,7 @@ export function normalizeWorkspace(workspace: WorkspaceData): WorkspaceData {
     ...workspace,
     members,
     fees,
+    demoSeats: Array.isArray(workspace.demoSeats) ? workspace.demoSeats : [],
     settings: {
       ...workspace.settings,
       seatSections,
@@ -263,9 +278,17 @@ export function buildWorkspaceChanges(
     p_attendance: changedRows(previous.attendance, next.attendance).map((row) =>
       attendanceToRow(row, libraryId),
     ),
+    p_demo_seats: changedRows(
+      previous.demoSeats || [],
+      next.demoSeats || [],
+    ).map((row) => demoSeatToRow(row, libraryId)),
     p_deleted_member_ids: removedIds(previous.members, next.members),
     p_deleted_payment_ids: removedIds(previous.fees, next.fees),
     p_deleted_attendance_ids: removedIds(previous.attendance, next.attendance),
+    p_deleted_demo_seat_ids: removedIds(
+      previous.demoSeats || [],
+      next.demoSeats || [],
+    ),
   };
 }
 
@@ -293,8 +316,8 @@ export const workspaceRepository = {
       );
     }
 
-    const [membersResult, paymentsResult, attendanceResult] = await Promise.all(
-      [
+    const [membersResult, paymentsResult, attendanceResult, demoSeatsResult] =
+      await Promise.all([
         client
           .from("members")
           .select("*")
@@ -310,9 +333,15 @@ export const workspaceRepository = {
           .select("*")
           .eq("library_id", library.id)
           .order("attendance_date"),
-      ],
+        client
+          .from("seat_demos")
+          .select("*")
+          .eq("library_id", library.id)
+          .order("seat_code"),
+      ]);
+    [membersResult, paymentsResult, attendanceResult, demoSeatsResult].forEach(
+      assertResult,
     );
-    [membersResult, paymentsResult, attendanceResult].forEach(assertResult);
 
     return normalizeWorkspace({
       settings: {
@@ -331,6 +360,7 @@ export const workspaceRepository = {
       members: (membersResult.data || []).map(rowToMember),
       fees: (paymentsResult.data || []).map(rowToPayment),
       attendance: (attendanceResult.data || []).map(rowToAttendance),
+      demoSeats: (demoSeatsResult.data || []).map(rowToDemoSeat),
     });
   },
 

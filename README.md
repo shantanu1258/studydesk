@@ -4,21 +4,24 @@ StudyDesk is a lightweight management app for Indian self-study libraries, paid 
 
 ## Features
 
-- Supabase email/password accounts for the founding owner and additional admins
+- Supabase email/password accounts for the Core admin and additional admins
 - Secure email password recovery with a dedicated new-password screen
 - In-app profile, profile-photo, and password management
 - One-time invitation codes for joining the same private library
-- A protected founding owner; additional admins have equal application access
+- A protected Core admin; additional admins have equal day-to-day application access
 - PostgreSQL storage protected by Row Level Security
 - Morning, Afternoon, Evening, Full Day, and repeatable numbered Hour plans
 - Member admission, overlap-aware seat assignment, editable plan dates, and renewals
+- Unique phone-number identity with guided active-member lookup and inactive-member reactivation
 - Deactivation and reactivation with complete member and payment history preserved
+- Per-member fee history with payment count, totals, and direct corrections
+- Persistent, shift-aware demo seats shared by every admin
 - Configurable advance or later fee collection, including warned admission without payment
 - Monthly, yearly, custom-range, and lifetime fee reporting with CSV export
 - Optional manual attendance, disabled by default
 - Configurable seat sections with continuous ranges such as A-01–A-20 and B-21–B-40
 - Seat count and library colours during setup, with editable library-wide theming
-- Four-day correction window for payments; older records remain locked in the app
+- Payment corrections at any age with an extra confirmation for older records; deletion remains limited to four days
 - JSON backup and restore
 - Local demo mode with sample records
 - Responsive desktop and mobile layout
@@ -62,11 +65,11 @@ Run `npm run check` to verify the application and create a production build.
 ## Connect real accounts and cloud data
 
 1. Create a Supabase project.
-2. Run the files in `supabase/migrations/` in number order in its SQL Editor. Existing projects should run every migration they have not applied yet, including `003_profile_photos.sql`.
+2. Run the files in `supabase/migrations/` in number order in its SQL Editor. Existing projects should run every migration they have not applied yet, including `004_demo_seats_and_fee_controls.sql`.
 3. Copy `.env.example` to `.env.local` and add the Project URL and publishable key.
 4. Add `http://localhost:3000/**` to the Supabase authentication Redirect URLs.
 5. Before serving real users, configure a custom SMTP provider in **Authentication → Emails → SMTP Settings** so confirmation and password-reset emails can be delivered reliably.
-6. Reload StudyDesk and create the founding owner account.
+6. Reload StudyDesk and create the Core admin account.
 7. To add another administrator, create a one-time code in **Settings → Library team**. They choose **Join with code** during signup.
 
 Only the public publishable key belongs in the frontend. Never add a Supabase `service_role` or secret key.
@@ -77,4 +80,4 @@ Follow [DEPLOYMENT.md](DEPLOYMENT.md) for a browser-only GitHub upload and free 
 
 ## Security model
 
-Every application table has Row Level Security enabled. The browser signs requests with the current Supabase session, and database policies limit access to users attached to that library. Team changes go through protected database functions, and the founding owner cannot be removed. Signed-out requests receive no library data.
+Every application table has Row Level Security enabled. The browser signs requests with the current Supabase session, and database policies limit access to users attached to that library. Team changes go through protected database functions; only the Core admin can remove another admin, and the Core admin cannot be removed. Signed-out requests receive no library data.

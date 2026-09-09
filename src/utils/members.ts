@@ -1,30 +1,46 @@
 import type { Member, Payment } from "../types/domain";
 import { daysUntil } from "./format";
 
-export const normalizeMemberName = (value: unknown) =>
-  String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase();
+export const normalizeMemberPhone = (value: unknown) =>
+  String(value || "").trim();
 
-export const sameMemberIdentity = (
-  member: Pick<Member, "name" | "phone"> | undefined,
-  name: string,
+export const sameMemberPhone = (
+  member: Pick<Member, "phone"> | undefined,
   phone: string,
-) =>
-  normalizeMemberName(member?.name) === normalizeMemberName(name) &&
-  String(member?.phone || "").trim() === String(phone || "").trim();
+) => normalizeMemberPhone(member?.phone) === normalizeMemberPhone(phone);
 
-export const findMemberByIdentity = (
+export const findMemberByPhone = (
   members: Member[],
-  name: string,
   phone: string,
   exceptId = "",
 ) =>
   members.find(
-    (member) =>
-      member.id !== exceptId && sameMemberIdentity(member, name, phone),
+    (member) => member.id !== exceptId && sameMemberPhone(member, phone),
   );
+
+export const paymentPeriodsOverlap = (
+  firstStart: string,
+  firstEnd: string,
+  secondStart: string,
+  secondEnd: string,
+) => firstStart < secondEnd && secondStart < firstEnd;
+
+export const findOverlappingPayment = (
+  payments: Payment[],
+  memberId: string,
+  periodStart: string,
+  periodEnd: string,
+  exceptId = "",
+) =>
+  payments.find((payment) => {
+    const savedStart = payment.periodStart || payment.date;
+    const savedEnd = payment.periodEnd || payment.date;
+    return (
+      payment.id !== exceptId &&
+      payment.memberId === memberId &&
+      paymentPeriodsOverlap(periodStart, periodEnd, savedStart, savedEnd)
+    );
+  });
 
 export const currentPaymentForMember = (
   member: Member,

@@ -5,6 +5,7 @@ import { memberStatus } from "../../utils/members";
 import { seatCodes } from "../../utils/seats";
 import {
   configuredShifts,
+  demoOccupiesShift,
   memberOccupiesShift,
   shiftTiming,
 } from "../../utils/shifts";
@@ -47,6 +48,7 @@ export function SeatLegend() {
     ["occupied", "Occupied"],
     ["overdue", "Payment overdue"],
     ["due", "Renewal due"],
+    ["demo", "Demo"],
     ["available", "Available"],
   ];
   return (
@@ -74,15 +76,21 @@ export function SeatGrid({
   const members = data.members.filter((member) =>
     memberOccupiesShift(member, shift, data.settings.shifts),
   );
+  const demos = data.demoSeats.filter((demo) =>
+    demoOccupiesShift(demo, shift, data.settings.shifts),
+  );
   return (
     <div
       className={`grid gap-2.5 ${compact ? "grid-cols-4 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-5 xl:grid-cols-6"}`}
     >
       {seatCodes(data.settings).map((seat) => {
         const member = members.find((item) => item.seat === seat);
+        const demo = demos.find((item) => item.seat === seat);
         const paymentStatus = member ? memberStatus(member, data.fees) : null;
         const status = !member
-          ? "available"
+          ? demo
+            ? "demo"
+            : "available"
           : paymentStatus?.tone === "overdue"
             ? "overdue"
             : paymentStatus?.tone === "due"
@@ -90,11 +98,12 @@ export function SeatGrid({
               : "occupied";
         const colors = {
           available:
-            "border-dashed border-slate-300 bg-white text-slate-600 hover:border-slate-500",
+            "status-available-surface border-dashed hover:brightness-95",
           occupied:
             "border-transparent bg-[var(--brand)] text-[var(--button-text)] hover:brightness-110",
           overdue: "status-danger-solid hover:brightness-90",
           due: "status-warning-solid hover:brightness-95",
+          demo: "status-demo-solid hover:brightness-95",
         }[status];
         return (
           <button
@@ -104,23 +113,29 @@ export function SeatGrid({
               setModal(
                 member
                   ? { type: "info", id: member.id }
-                  : { type: "member", seat, shift },
+                  : { type: "seat-actions", seat, shift },
               )
             }
             className={`min-h-17 rounded-xl border p-2 text-center transition ${colors}`}
             title={
-              member ? `${member.name} · ${paymentStatus?.label}` : "Available"
+              member
+                ? `${member.name} · ${paymentStatus?.label}`
+                : demo
+                  ? `Demo · ${demo.shift}`
+                  : "Available"
             }
             aria-label={
               member
                 ? `${seat}, ${member.name}, ${paymentStatus?.label}`
-                : `${seat}, available`
+                : demo
+                  ? `${seat}, demo, ${demo.shift}`
+                  : `${seat}, available`
             }
           >
             <span className="block text-sm font-extrabold">{seat}</span>
             {!compact && (
               <small className="mt-0.5 block truncate text-xs font-semibold opacity-75">
-                {member ? member.name.split(" ")[0] : "Free"}
+                {member ? member.name.split(" ")[0] : demo ? "Demo" : "Free"}
               </small>
             )}
           </button>

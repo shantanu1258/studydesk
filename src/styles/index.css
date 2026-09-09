@@ -15,9 +15,14 @@
   --status-danger: #a11111c9;
   --status-danger-text: var(--status-danger);
   --status-warning: #f2a900;
+  --status-demo: #2563eb;
+  --status-demo-border: #1d4ed8;
   --status-danger-contrast: #ffffff;
   --status-warning-contrast: #352300;
   --status-warning-text: #805000;
+  --status-available-bg: #e2e8f0;
+  --status-available-border: #94a3b8;
+  --status-available-text: #334155;
   --status-danger-soft: color-mix(
     in srgb,
     var(--status-danger) 7%,
@@ -54,6 +59,9 @@
   --border-input: #3b4c45;
   --status-warning-text: #ffc94d;
   --status-danger-text: color-mix(in srgb, var(--status-danger) 62%, white);
+  --status-available-bg: #22302b;
+  --status-available-border: #17231f;
+  --status-available-text: #e7eeea;
 }
 
 @theme {
@@ -225,6 +233,11 @@
     background: var(--status-warning);
     color: var(--status-warning-contrast);
   }
+  .status-demo-solid {
+    border-color: var(--status-demo-border);
+    background: var(--status-demo);
+    color: #ffffff;
+  }
   .status-danger-surface {
     border-color: var(--status-danger-border);
     background: var(--status-danger-soft);
@@ -232,6 +245,11 @@
   .status-warning-surface {
     border-color: var(--status-warning-border);
     background: var(--status-warning-soft);
+  }
+  .status-available-surface {
+    border-color: var(--status-available-border);
+    background: var(--status-available-bg);
+    color: var(--status-available-text);
   }
   .status-danger-text {
     color: var(--status-danger-text);

@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   Navigate,
   NavLink,
@@ -34,7 +40,12 @@ import { MemberDialogRouter } from "../../features/members/MemberDialogs";
 import { MembersPage } from "../../features/members/MembersPage";
 import { SearchPage } from "../../features/search/SearchPage";
 import { SettingsPage } from "../../features/settings/SettingsPage";
-import type { AppUser, ProfileUpdateInput, ViewId } from "../../types/domain";
+import type {
+  AppUser,
+  ModalState,
+  ProfileUpdateInput,
+  ViewId,
+} from "../../types/domain";
 import { initials } from "../../utils/format";
 import { libraryTheme } from "../../utils/theme";
 
@@ -67,6 +78,9 @@ const VIEW_PATHS: Record<ViewId, string> = {
   settings: "/settings",
 };
 
+const sameModal = (first?: ModalState, second?: ModalState) =>
+  JSON.stringify(first) === JSON.stringify(second);
+
 function viewForPath(pathname: string): ViewId | null {
   const normalized = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
   const match = Object.entries(VIEW_PATHS).find(
@@ -93,10 +107,15 @@ export function WorkspaceShell({
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [workspaceModalStack, setWorkspaceModalStack] = useState<ModalState[]>(
+    [],
+  );
+  const workspaceModal = workspaceModalStack.at(-1) || null;
   const currentView = viewForPath(location.pathname) || "overview";
 
   useEffect(() => {
     controller.setMenuOpen(false);
+    setWorkspaceModalStack([]);
     window.scrollTo({ top: 0 });
   }, [location.pathname, controller.setMenuOpen]);
 
@@ -115,6 +134,19 @@ export function WorkspaceShell({
     setBrowserThemeColor(color);
     return () => setBrowserThemeColor(null);
   }, [controller.data?.settings.primaryColor, setBrowserThemeColor]);
+
+  const setWorkspaceModal = useCallback<
+    Dispatch<SetStateAction<ModalState | null>>
+  >((action) => {
+    setWorkspaceModalStack((stack) => {
+      const current = stack.at(-1) || null;
+      const next = typeof action === "function" ? action(current) : action;
+      if (!next) return stack.slice(0, -1);
+      if (sameModal(current || undefined, next)) return stack;
+      if (sameModal(stack.at(-2), next)) return stack.slice(0, -1);
+      return [...stack, next];
+    });
+  }, []);
 
   const openView = (view: ViewId) => {
     controller.setQuery("");
@@ -229,7 +261,7 @@ export function WorkspaceShell({
             data={data}
             shift={controller.shift}
             setShift={controller.setShift}
-            setModal={controller.setModal}
+            setModal={setWorkspaceModal}
             openView={openView}
           />
         }
@@ -242,13 +274,13 @@ export function WorkspaceShell({
             shift={controller.shift}
             query={controller.query}
             setQuery={controller.setQuery}
-            setModal={controller.setModal}
+            setModal={setWorkspaceModal}
           />
         }
       />
       <Route
         path="/fees"
-        element={<FeesPage data={data} setModal={controller.setModal} />}
+        element={<FeesPage data={data} setModal={setWorkspaceModal} />}
       />
       <Route
         path="/search"
@@ -257,7 +289,7 @@ export function WorkspaceShell({
             data={data}
             query={controller.query}
             setQuery={controller.setQuery}
-            setModal={controller.setModal}
+            setModal={setWorkspaceModal}
             onClose={closeSearch}
           />
         }
@@ -424,7 +456,7 @@ export function WorkspaceShell({
                   label: "Add member",
                   icon: <PlusIcon className="size-4" />,
                   onClick: () =>
-                    controller.setModal({
+                    setWorkspaceModal({
                       type: "member",
                       shift: controller.shift,
                     }),
@@ -449,13 +481,13 @@ export function WorkspaceShell({
       >
         <ArrowUpIcon className="size-5" />
       </button>
-      {controller.modal && (
+      {workspaceModal && (
         <MemberDialogRouter
-          modal={controller.modal}
+          modal={workspaceModal}
           data={data}
           shift={controller.shift}
           commit={controller.commit}
-          setModal={controller.setModal}
+          setModal={setWorkspaceModal}
         />
       )}
       {accountOpen && (

@@ -45,6 +45,13 @@ export interface SeatSection {
   prefix: string;
   start: number;
   end: number;
+  defaultFee: number;
+}
+
+export interface SeatDemo {
+  id: string;
+  seat: string;
+  shift: string;
 }
 
 export interface LibrarySettings {
@@ -103,6 +110,7 @@ export interface WorkspaceData {
   members: Member[];
   fees: Payment[];
   attendance: AttendanceRecord[];
+  demoSeats: SeatDemo[];
 }
 
 export interface TeamMember {
@@ -122,11 +130,13 @@ export type ModalState =
   | { type: "member"; seat?: string; shift?: string }
   | { type: "member-reactivate"; id: string }
   | { type: "info"; id: string }
+  | { type: "member-fees"; id: string }
   | { type: "renew"; id: string }
   | { type: "member-edit"; id: string }
   | { type: "seat-change"; id: string }
+  | { type: "seat-actions"; seat: string; shift: string }
   | { type: "member-deactivate"; id: string }
-  | { type: "payment-edit"; id: string }
+  | { type: "payment-edit"; id: string; returnToMemberId?: string }
   | { type: "payment-delete"; id: string };
 
 export type ToastTone = "success" | "error" | "warning" | "info";
@@ -168,7 +178,9 @@ export interface WorkspaceChangeSet {
   p_members: Record<string, unknown>[];
   p_payments: Record<string, unknown>[];
   p_attendance: Record<string, unknown>[];
+  p_demo_seats: Record<string, unknown>[];
   p_deleted_member_ids: string[];
   p_deleted_payment_ids: string[];
   p_deleted_attendance_ids: string[];
+  p_deleted_demo_seat_ids: string[];
 }

@@ -11,6 +11,7 @@ import { SearchField } from "../../components/ui/SearchField";
 import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { DueMemberCard } from "../../components/workspace/DueMemberCard";
+import { PAYMENT_EDIT_REVIEW_DAYS } from "../../config/constants";
 import type { ModalState, Payment, WorkspaceData } from "../../types/domain";
 import {
   daysSince,
@@ -22,7 +23,6 @@ import {
 import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 
-const PAYMENT_EDIT_WINDOW_DAYS = 4;
 const ARCHIVE_MONTH_BATCH = 3;
 const firstOfMonth = (date: string) => `${date.slice(0, 7)}-01`;
 const moveMonth = (date: string, amount: number) => {
@@ -371,11 +371,15 @@ export function FeesPage({
                     open={index === 0}
                     className="border-b border-slate-200 last:border-0"
                   >
-                    <summary className="flex cursor-pointer items-center justify-between gap-3 p-4 marker:text-slate-400 sm:px-6">
+                    <summary className="flex cursor-pointer items-center justify-between gap-3 bg-slate-50 p-4 marker:text-slate-500 transition hover:bg-slate-100 sm:px-6">
                       <span>
-                        <strong className="block">{monthLabel(month)}</strong>
+                        <strong className="inline-flex rounded-lg bg-[var(--accent)] px-2.5 py-1 text-[var(--accent-text)]">
+                          {monthLabel(month)}
+                        </strong>
                         <small className="text-slate-500">
-                          {monthPayments.length} payments
+                          <span className="mt-1.5 block">
+                            {monthPayments.length} payments · Select to expand
+                          </span>
                         </small>
                       </span>
                       <b>
@@ -389,9 +393,9 @@ export function FeesPage({
                     </summary>
                     <div className="grid gap-px bg-slate-200">
                       {monthPayments.map((payment) => {
-                        const editable =
+                        const deletable =
                           daysSince(payment.date) >= 0 &&
-                          daysSince(payment.date) <= PAYMENT_EDIT_WINDOW_DAYS;
+                          daysSince(payment.date) <= PAYMENT_EDIT_REVIEW_DAYS;
                         const member = data.members.find(
                           (item) => item.id === payment.memberId,
                         );
@@ -424,19 +428,19 @@ export function FeesPage({
                             </div>
                             <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
                               <b>{money(payment.amount)}</b>
-                              {editable ? (
-                                <span className="flex gap-2 sm:mt-2">
-                                  <button
-                                    className="text-xs font-extrabold text-slate-700 underline"
-                                    onClick={() =>
-                                      setModal({
-                                        type: "payment-edit",
-                                        id: payment.id,
-                                      })
-                                    }
-                                  >
-                                    Edit
-                                  </button>
+                              <span className="flex gap-2 sm:mt-2">
+                                <button
+                                  className="text-xs font-extrabold text-slate-700 underline"
+                                  onClick={() =>
+                                    setModal({
+                                      type: "payment-edit",
+                                      id: payment.id,
+                                    })
+                                  }
+                                >
+                                  Edit
+                                </button>
+                                {deletable ? (
                                   <button
                                     className="status-danger-text text-xs font-extrabold underline"
                                     onClick={() =>
@@ -448,12 +452,12 @@ export function FeesPage({
                                   >
                                     Delete
                                   </button>
-                                </span>
-                              ) : (
-                                <small className="block text-slate-400">
-                                  Locked
-                                </small>
-                              )}
+                                ) : (
+                                  <small className="font-semibold text-slate-400">
+                                    Delete locked
+                                  </small>
+                                )}
+                              </span>
                             </div>
                           </div>
                         );
@@ -495,8 +499,8 @@ export function FeesPage({
             )}
           </div>
           <p className="helper p-4 sm:px-6">
-            Recent payments can be corrected for 4 days. Older records remain
-            visible but locked.
+            Every payment can be corrected. Payments older than 4 days show an
+            extra warning; deletion remains limited to recent records.
           </p>
         </article>
       </div>

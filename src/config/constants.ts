@@ -66,9 +66,11 @@ export const DEFAULT_SHIFTS: Shift[] = [
 ];
 
 export const DEFAULT_FEE_COLLECTION = "advance" as const;
+export const DEFAULT_MONTHLY_FEE = 800;
 export const DEFAULT_ATTENDANCE_ENABLED = false;
 export const DEFAULT_PRIMARY_COLOR = "#334155";
 export const DEFAULT_SECONDARY_COLOR = "#E2E8F0";
+export const PAYMENT_EDIT_REVIEW_DAYS = 4;
 
 export const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string }> = [
   { id: "overview", label: "Overview" },
