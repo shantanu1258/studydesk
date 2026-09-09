@@ -1,0 +1,46 @@
+{
+  "name": "studydesk",
+  "version": "0.1.0",
+  "description": "Seat, member, fee and attendance management for Indian self-study libraries.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3000 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 3000 --strictPort",
+    "format": "prettier --write . --ignore-path .gitignore",
+    "format:check": "prettier --check . --ignore-path .gitignore",
+    "typecheck": "tsc --noEmit",
+    "test": "esbuild tests/*.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=.test-dist && node --test .test-dist/*.test.mjs",
+    "check": "npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.78.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
+    "esbuild": "0.25.12",
+    "postcss": "^8.5.6",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.9.3",
+    "vite": "6.4.3",
+    "vite-plugin-pwa": "0.21.2",
+    "workbox-build": "7.3.0",
+    "workbox-window": "7.3.0"
+  },
+  "overrides": {
+    "smob": "1.5.0",
+    "tar": "7.5.15",
+    "jiti": "2.6.1",
+    "enhanced-resolve": "5.18.1"
+  }
+}
