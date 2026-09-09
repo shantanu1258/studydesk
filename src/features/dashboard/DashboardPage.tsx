@@ -224,6 +224,7 @@ export function DashboardPage({
               label="Seat occupancy"
               value={`${occupied}/${data.settings.seatCount} (${percent}%)`}
               percent={percent}
+              tone="positive"
             />
           </div>
           <div className="mt-5">
@@ -316,7 +317,7 @@ export function DashboardPage({
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
                   <div
-                    className="h-full rounded-full bg-[var(--brand)] transition-[width]"
+                    className="h-full rounded-full bg-emerald-600 transition-[width]"
                     style={{ width: `${Math.min(option.percent, 100)}%` }}
                   />
                 </div>

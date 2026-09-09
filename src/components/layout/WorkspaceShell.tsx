@@ -24,6 +24,7 @@ import {
 } from "../ui/Icons";
 import { Toast } from "../ui/Toast";
 import { NAV_ITEMS } from "../../config/constants";
+import { useTheme } from "../../context/ThemeContext";
 import { useWorkspaceController } from "../../controllers/useWorkspaceController";
 import { AccountDialog } from "../../features/account/AccountDialog";
 import { AttendancePage } from "../../features/attendance/AttendancePage";
@@ -86,6 +87,7 @@ export function WorkspaceShell({
   onChangePassword: (password: string) => Promise<void>;
 }) {
   const controller = useWorkspaceController(user);
+  const { setBrowserThemeColor } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -107,6 +109,12 @@ export function WorkspaceShell({
       navigate("/", { replace: true });
     }
   }, [controller.data, currentView, navigate]);
+
+  useEffect(() => {
+    const color = controller.data?.settings.primaryColor || null;
+    setBrowserThemeColor(color);
+    return () => setBrowserThemeColor(null);
+  }, [controller.data?.settings.primaryColor, setBrowserThemeColor]);
 
   const openView = (view: ViewId) => {
     controller.setQuery("");
@@ -366,8 +374,8 @@ export function WorkspaceShell({
                   {controller.mode === "demo"
                     ? "Demo account"
                     : data.settings.isFounder
-                      ? "Founding owner"
-                      : "Administrator"}
+                      ? "Core admin"
+                      : "Admin"}
                 </small>
               </span>
             </button>

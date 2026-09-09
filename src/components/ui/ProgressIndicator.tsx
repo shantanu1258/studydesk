@@ -3,13 +3,20 @@ interface ProgressIndicatorProps {
   value: string;
   percent: number;
   className?: string;
+  tone?: "brand" | "positive";
 }
+
+const fillColors = {
+  brand: "bg-[var(--brand)]",
+  positive: "bg-emerald-600",
+};
 
 export function ProgressIndicator({
   label,
   value,
   percent,
   className = "",
+  tone = "brand",
 }: ProgressIndicatorProps) {
   const safePercent = Math.max(0, Math.min(percent, 100));
   return (
@@ -27,7 +34,7 @@ export function ProgressIndicator({
         aria-valuenow={safePercent}
       >
         <div
-          className="h-full rounded-full bg-[var(--brand)] transition-[width] duration-300"
+          className={`h-full rounded-full transition-[width] duration-300 ${fillColors[tone]}`}
           style={{ width: `${safePercent}%` }}
         />
       </div>

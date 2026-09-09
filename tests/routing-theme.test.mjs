@@ -38,9 +38,16 @@ test("search close returns through browser history with a direct-load fallback",
   );
 });
 
-test("dark mode follows the device initially and persists the chosen theme", () => {
-  assert.match(theme, /prefers-color-scheme: dark/);
-  assert.match(theme, /localStorage\.setItem\(THEME_STORAGE_KEY, theme\)/);
+test("light mode is the default and an explicit choice persists", () => {
+  assert.doesNotMatch(theme, /prefers-color-scheme: dark/);
+  assert.match(theme, /localStorage\.getItem\(THEME_STORAGE_KEY\)/);
+  assert.match(theme, /saveTheme\(next\)/);
   assert.match(index, /studydesk-color-theme/);
+  assert.match(index, /name="color-scheme" content="light dark"/);
   assert.match(header, /<ThemeToggle/);
+});
+
+test("installed-app browser chrome follows the configured header color", () => {
+  assert.match(workspace, /setBrowserThemeColor\(color\)/);
+  assert.match(workspace, /settings\.primaryColor/);
 });

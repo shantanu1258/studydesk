@@ -752,7 +752,7 @@ export function SettingsPage({
           <div className="section-title">
             <div>
               <h2>Library team</h2>
-              <p>Every administrator has the same access</p>
+              <p>Core admin and admins have the same workspace access</p>
             </div>
             <Button
               disabled={team.busy}
@@ -790,18 +790,28 @@ export function SettingsPage({
                     {member.email}
                   </span>
                 </div>
-                {member.founder ? (
-                  <StatusPill tone="neutral">Founder · protected</StatusPill>
-                ) : member.id === user.id ? (
-                  <StatusPill tone="neutral">You</StatusPill>
-                ) : (
-                  <Button
-                    variant="danger"
-                    onClick={() => setRemoveTarget(member)}
-                  >
-                    Remove
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {member.founder ? (
+                    <StatusPill tone="neutral">
+                      Core admin{member.id === user.id ? " · You" : ""} ·
+                      protected
+                    </StatusPill>
+                  ) : (
+                    <>
+                      <StatusPill tone="neutral">
+                        Admin{member.id === user.id ? " · You" : ""}
+                      </StatusPill>
+                      {member.id !== user.id && (
+                        <Button
+                          variant="danger"
+                          onClick={() => setRemoveTarget(member)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>

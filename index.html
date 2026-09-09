@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#334155" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="application-name" content="StudyDesk" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -13,12 +14,7 @@
       (() => {
         try {
           const saved = localStorage.getItem("studydesk-color-theme");
-          const theme =
-            saved === "light" || saved === "dark"
-              ? saved
-              : matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light";
+          const theme = saved === "light" || saved === "dark" ? saved : "light";
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
           document
