@@ -5,7 +5,6 @@ import type {
   ModalState,
   ToastMessage,
   ToastTone,
-  ViewId,
   WorkspaceData,
   WorkspaceMutation,
 } from "../types/domain";
@@ -18,14 +17,12 @@ export function useWorkspaceController(user: AppUser) {
   const [loadError, setLoadError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [view, setView] = useState<ViewId>("overview");
   const [shift, setShift] = useState("Morning");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState<ModalState | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const previousViewRef = useRef<ViewId>("overview");
   const dataRef = useRef<WorkspaceData | null>(null);
   const writeQueue = useRef<Promise<unknown>>(Promise.resolve());
   const pendingWrites = useRef(0);
@@ -67,31 +64,9 @@ export function useWorkspaceController(user: AppUser) {
       setShift(shifts[0]?.name || "Daily");
   }, [data, shift]);
 
-  useEffect(() => {
-    if (data && !data.settings.attendanceEnabled && view === "attendance") {
-      setView("overview");
-    }
-  }, [data, view]);
-
   const retry = useCallback(() => {
     setRetrying(true);
     setReloadKey((value) => value + 1);
-  }, []);
-
-  const openView = useCallback((next: ViewId) => {
-    setView((current) => {
-      if (next === "search" && current !== "search")
-        previousViewRef.current = current;
-      return next;
-    });
-    setQuery("");
-    setMenuOpen(false);
-  }, []);
-
-  const closeSearch = useCallback(() => {
-    setView(previousViewRef.current);
-    setQuery("");
-    setMenuOpen(false);
   }, []);
 
   const commit = useCallback(
@@ -145,9 +120,6 @@ export function useWorkspaceController(user: AppUser) {
     retry,
     saveState,
     mode,
-    view,
-    openView,
-    closeSearch,
     shift,
     setShift,
     query,

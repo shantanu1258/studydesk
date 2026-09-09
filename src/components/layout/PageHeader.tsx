@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CloseIcon, MenuIcon, SearchIcon } from "../ui/Icons";
+import { ThemeToggle } from "../ui/ThemeToggle";
 
 interface HeaderAction {
   label: string;
@@ -78,7 +79,7 @@ export function PageHeader({
             className="flex min-w-0 items-center gap-2 rounded-xl text-left transition hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             aria-label="Open Overview"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white">
+            <span className="theme-static-white grid size-9 shrink-0 place-items-center rounded-lg bg-white">
               <img
                 className="size-8 rounded-md"
                 src="./studydesk-monogram.png"
@@ -93,13 +94,14 @@ export function PageHeader({
               <button
                 type="button"
                 onClick={primaryAction.onClick}
-                className="inline-flex size-10 items-center justify-center rounded-xl border border-white/70 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
+                className="theme-static-white inline-flex size-10 items-center justify-center rounded-xl border border-white/70 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
                 aria-label={primaryAction.label}
                 title={primaryAction.label}
               >
                 {primaryAction.icon}
               </button>
             )}
+            <ThemeToggle className="text-[var(--button-text)] hover:bg-white/10" />
             <button
               type="button"
               onClick={onSearch}
@@ -170,6 +172,7 @@ export function PageHeader({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle className="text-slate-700 hover:bg-slate-200/70" />
             <button
               type="button"
               onClick={onSearch}

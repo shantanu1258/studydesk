@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { InstallAppHeaderAction } from "../pwa/InstallApp";
 import { PageHeader } from "./PageHeader";
 import { Button } from "../ui/Button";
@@ -49,6 +57,23 @@ const icons = {
   settings: SettingsIcon,
 };
 
+const VIEW_PATHS: Record<ViewId, string> = {
+  overview: "/",
+  members: "/members",
+  fees: "/fees",
+  search: "/search",
+  attendance: "/attendance",
+  settings: "/settings",
+};
+
+function viewForPath(pathname: string): ViewId | null {
+  const normalized = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
+  const match = Object.entries(VIEW_PATHS).find(
+    ([, path]) => path === normalized,
+  );
+  return (match?.[0] as ViewId | undefined) || null;
+}
+
 export function WorkspaceShell({
   user,
   onLogout,
@@ -61,9 +86,50 @@ export function WorkspaceShell({
   onChangePassword: (password: string) => Promise<void>;
 }) {
   const controller = useWorkspaceController(user);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const currentView = viewForPath(location.pathname) || "overview";
+
+  useEffect(() => {
+    controller.setMenuOpen(false);
+    window.scrollTo({ top: 0 });
+  }, [location.pathname, controller.setMenuOpen]);
+
+  useEffect(() => {
+    if (
+      controller.data &&
+      !controller.data.settings.attendanceEnabled &&
+      currentView === "attendance"
+    ) {
+      navigate("/", { replace: true });
+    }
+  }, [controller.data, currentView, navigate]);
+
+  const openView = (view: ViewId) => {
+    controller.setQuery("");
+    controller.setMenuOpen(false);
+    const path = VIEW_PATHS[view];
+    if (view === "search" && location.pathname !== path) {
+      navigate(path, { state: { from: location.pathname } });
+      return;
+    }
+    navigate(path);
+  };
+
+  const closeSearch = () => {
+    controller.setQuery("");
+    controller.setMenuOpen(false);
+    const state = location.state as { from?: string } | null;
+    if (state?.from && state.from !== VIEW_PATHS.search) {
+      navigate(-1);
+      return;
+    }
+    navigate(VIEW_PATHS.overview, { replace: true });
+  };
+
   if (controller.loadError)
     return (
       <main className="grid min-h-dvh place-content-center gap-4 bg-[#f3f5f2] p-6 text-center">
@@ -118,12 +184,12 @@ export function WorkspaceShell({
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const [title, subtitle] =
-    controller.view === "overview"
+    currentView === "overview"
       ? [
           `${greeting}, ${firstName}.`,
           "Here’s how your study hall is doing today.",
         ]
-      : PAGE_COPY[controller.view];
+      : PAGE_COPY[currentView];
   const dateLabel = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
     day: "numeric",
@@ -144,48 +210,75 @@ export function WorkspaceShell({
       : controller.saveState === "error"
         ? "Save issue"
         : "";
-  const canAddFromHeader = controller.view === "overview";
+  const canAddFromHeader = currentView === "overview";
 
-  const page = {
-    overview: (
-      <DashboardPage
-        data={data}
-        shift={controller.shift}
-        setShift={controller.setShift}
-        setModal={controller.setModal}
-        openView={controller.openView}
+  const page = (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <DashboardPage
+            data={data}
+            shift={controller.shift}
+            setShift={controller.setShift}
+            setModal={controller.setModal}
+            openView={openView}
+          />
+        }
       />
-    ),
-    members: (
-      <MembersPage
-        data={data}
-        shift={controller.shift}
-        query={controller.query}
-        setQuery={controller.setQuery}
-        setModal={controller.setModal}
+      <Route
+        path="/members"
+        element={
+          <MembersPage
+            data={data}
+            shift={controller.shift}
+            query={controller.query}
+            setQuery={controller.setQuery}
+            setModal={controller.setModal}
+          />
+        }
       />
-    ),
-    fees: <FeesPage data={data} setModal={controller.setModal} />,
-    search: (
-      <SearchPage
-        data={data}
-        query={controller.query}
-        setQuery={controller.setQuery}
-        setModal={controller.setModal}
-        onClose={controller.closeSearch}
+      <Route
+        path="/fees"
+        element={<FeesPage data={data} setModal={controller.setModal} />}
       />
-    ),
-    attendance: <AttendancePage data={data} commit={controller.commit} />,
-    settings: (
-      <SettingsPage
-        data={data}
-        commit={controller.commit}
-        storageMode={controller.mode}
-        user={user}
-        showToast={controller.showToast}
+      <Route
+        path="/search"
+        element={
+          <SearchPage
+            data={data}
+            query={controller.query}
+            setQuery={controller.setQuery}
+            setModal={controller.setModal}
+            onClose={closeSearch}
+          />
+        }
       />
-    ),
-  }[controller.view];
+      <Route
+        path="/attendance"
+        element={
+          data.settings.attendanceEnabled ? (
+            <AttendancePage data={data} commit={controller.commit} />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <SettingsPage
+            data={data}
+            commit={controller.commit}
+            storageMode={controller.mode}
+            user={user}
+            showToast={controller.showToast}
+          />
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 
   return (
     <main
@@ -195,8 +288,13 @@ export function WorkspaceShell({
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex w-[286px] flex-col bg-[var(--brand)] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${controller.menuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="flex items-center gap-3 border-b border-white/15 p-5">
-          <span className="grid size-11 place-items-center rounded-xl bg-white">
+        <NavLink
+          to="/"
+          onClick={() => controller.setMenuOpen(false)}
+          className="flex items-center gap-3 border-b border-white/15 p-5 transition hover:bg-white/5"
+          aria-label="Open Overview"
+        >
+          <span className="theme-static-white grid size-11 place-items-center rounded-xl bg-white">
             <img
               className="size-9 rounded-lg"
               src="./studydesk-monogram.png"
@@ -207,7 +305,7 @@ export function WorkspaceShell({
             <strong className="block text-lg">StudyDesk</strong>
             <small className="text-white/70">Reading room manager</small>
           </div>
-        </div>
+        </NavLink>
         <div className="mx-4 mt-5 rounded-2xl border border-white/15 bg-white/10 p-4">
           <small className="text-[10px] font-extrabold tracking-[.18em] text-white/65">
             YOUR WORKSPACE
@@ -220,15 +318,21 @@ export function WorkspaceShell({
           {visibleNav.map((item) => {
             const Icon = icons[item.id];
             return (
-              <button
+              <NavLink
                 key={item.id}
-                type="button"
-                onClick={() => controller.openView(item.id)}
-                className={`flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-left text-sm font-extrabold transition ${controller.view === item.id ? "bg-white text-slate-900 shadow-sm" : "text-white hover:bg-white/10"}`}
+                to={VIEW_PATHS[item.id]}
+                end={item.id === "overview"}
+                onClick={() => {
+                  controller.setQuery("");
+                  controller.setMenuOpen(false);
+                }}
+                className={({ isActive }) =>
+                  `flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-left text-sm font-extrabold transition ${isActive ? "theme-static-white bg-white text-slate-900 shadow-sm" : "text-white hover:bg-white/10"}`
+                }
               >
                 <Icon className="size-5" />
                 <span>{item.label}</span>
-              </button>
+              </NavLink>
             );
           })}
         </nav>
@@ -304,9 +408,7 @@ export function WorkspaceShell({
           saveLabel={saveLabel}
           saveError={controller.saveState === "error"}
           utilityAction={
-            controller.view === "settings" ? (
-              <InstallAppHeaderAction />
-            ) : undefined
+            currentView === "settings" ? <InstallAppHeaderAction /> : undefined
           }
           primaryAction={
             canAddFromHeader
@@ -321,8 +423,8 @@ export function WorkspaceShell({
                 }
               : undefined
           }
-          onOpenOverview={() => controller.openView("overview")}
-          onSearch={() => controller.openView("search")}
+          onOpenOverview={() => openView("overview")}
+          onSearch={() => openView("search")}
           menuOpen={controller.menuOpen}
           onToggleMenu={() => controller.setMenuOpen(!controller.menuOpen)}
         />
