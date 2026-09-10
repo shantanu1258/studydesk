@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from "../../components/ui/Icons";
 import { SearchField } from "../../components/ui/SearchField";
 import type { ModalState, WorkspaceData } from "../../types/domain";
 import { matchesSearch } from "../../utils/search";
-import { MemberCard } from "../members/MembersPage";
+import { DemoCard, MemberCard } from "../members/MembersPage";
 
 export function SearchPage({
   data,
@@ -30,6 +30,22 @@ export function SearchPage({
         ]),
       )
     : [];
+  const demos =
+    hasQuery && data.settings.trackDemoVisitors
+      ? data.demoSeats.filter((demo) =>
+          matchesSearch(query, [
+            demo.name,
+            demo.phone,
+            demo.seat,
+            demo.shift,
+            "Demo",
+          ]),
+        )
+      : [];
+  const resultCount = members.length + demos.length;
+  const searchableCount =
+    data.members.length +
+    (data.settings.trackDemoVisitors ? data.demoSeats.length : 0);
 
   return (
     <section className="grid gap-4">
@@ -56,12 +72,12 @@ export function SearchPage({
         </div>
         <p className="mt-3 text-sm font-semibold text-slate-500">
           {hasQuery
-            ? `${members.length} ${members.length === 1 ? "member" : "members"} found`
-            : `${data.members.length} member records available to search`}
+            ? `${resultCount} ${resultCount === 1 ? "record" : "records"} found`
+            : `${searchableCount} records available to search`}
         </p>
       </div>
 
-      {hasQuery && members.length ? (
+      {hasQuery && resultCount ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {members.map((member) => (
             <MemberCard
@@ -71,6 +87,9 @@ export function SearchPage({
               setModal={setModal}
             />
           ))}
+          {demos.map((demo) => (
+            <DemoCard key={demo.id} demo={demo} setModal={setModal} />
+          ))}
         </div>
       ) : (
         <EmptyState
@@ -78,7 +97,9 @@ export function SearchPage({
           text={
             hasQuery
               ? "Try another name, phone number, seat or shift."
-              : "Active and deactivated members are both included."
+              : data.settings.trackDemoVisitors
+                ? "Active, demo, and deactivated records are included."
+                : "Active and deactivated members are both included."
           }
         />
       )}

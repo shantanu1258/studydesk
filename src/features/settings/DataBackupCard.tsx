@@ -95,6 +95,7 @@ export function DataBackupCard({
         feeCollection:
           restored.settings.feeCollection === "later" ? "later" : "advance",
         attendanceEnabled: restored.settings.attendanceEnabled === true,
+        trackDemoVisitors: restored.settings.trackDemoVisitors === true,
         primaryColor: normalizeColor(
           restored.settings.primaryColor,
           next.settings.primaryColor || DEFAULT_PRIMARY_COLOR,

@@ -1,9 +1,15 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PlusIcon, SearchIcon } from "../../components/ui/Icons";
+import { PhoneLink } from "../../components/ui/PhoneLink";
 import { StatusPill } from "../../components/ui/StatusPill";
-import type { Member, ModalState, WorkspaceData } from "../../types/domain";
+import type {
+  Member,
+  ModalState,
+  SeatDemo,
+  WorkspaceData,
+} from "../../types/domain";
 import { initials, prettyDate } from "../../utils/format";
 import { memberStatus } from "../../utils/members";
 
@@ -140,6 +146,143 @@ function MemberRow({
   );
 }
 
+export function DemoCard({
+  demo,
+  setModal,
+}: {
+  demo: SeatDemo;
+  setModal: Dispatch<SetStateAction<ModalState | null>>;
+}) {
+  const name = demo.name || "Demo visitor";
+  return (
+    <article className="rounded-2xl border p-4 status-demo-surface">
+      <div className="flex items-start gap-3">
+        <span className="status-demo-text grid size-11 shrink-0 place-items-center rounded-xl bg-white/80 text-sm font-extrabold">
+          {initials(name)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <strong className="block truncate text-base text-slate-900">
+            {name}
+          </strong>
+          <span className="flex items-center gap-2 text-sm text-slate-600">
+            {demo.phone || "Phone not recorded"}
+            {demo.phone && (
+              <PhoneLink phone={demo.phone} name={name} className="!size-7" />
+            )}
+          </span>
+        </div>
+        <StatusPill tone="demo">Demo</StatusPill>
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white/70 p-3 text-sm">
+        <div>
+          <dt className="text-xs text-slate-500">Seat</dt>
+          <dd className="font-bold">{demo.seat}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">Shift</dt>
+          <dd className="truncate font-bold">{demo.shift}</dd>
+        </div>
+      </dl>
+      <div className="mt-4 flex gap-2">
+        <button
+          className="flex-1 rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-sm font-extrabold text-[var(--accent-text)]"
+          onClick={() =>
+            setModal({
+              type: "seat-actions",
+              seat: demo.seat,
+              shift: demo.shift,
+            })
+          }
+        >
+          View demo
+        </button>
+        <button
+          className="flex-1 rounded-xl bg-[var(--brand)] px-3 py-2 text-sm font-extrabold text-[var(--button-text)]"
+          onClick={() =>
+            setModal({
+              type: "member",
+              seat: demo.seat,
+              shift: demo.shift,
+              demoId: demo.id,
+            })
+          }
+        >
+          Admit member
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function DemoRow({
+  demo,
+  setModal,
+}: {
+  demo: SeatDemo;
+  setModal: Dispatch<SetStateAction<ModalState | null>>;
+}) {
+  const name = demo.name || "Demo visitor";
+  return (
+    <tr className="border-t border-blue-200 status-demo-surface">
+      <td className="px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <span className="status-demo-text grid size-9 shrink-0 place-items-center rounded-lg bg-white/80 text-xs font-extrabold">
+            {initials(name)}
+          </span>
+          <div className="min-w-0">
+            <strong className="block truncate text-sm text-slate-900">
+              {name}
+            </strong>
+            <span className="flex items-center gap-2">
+              <small className="block text-slate-500">
+                {demo.phone || "Phone not recorded"}
+              </small>
+              {demo.phone && (
+                <PhoneLink phone={demo.phone} name={name} className="!size-7" />
+              )}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3.5 font-bold text-slate-800">{demo.seat}</td>
+      <td className="px-4 py-3.5 text-slate-700">{demo.shift}</td>
+      <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">—</td>
+      <td className="px-4 py-3.5">
+        <StatusPill tone="demo">Demo</StatusPill>
+      </td>
+      <td className="px-4 py-3.5 text-right">
+        <div className="ml-auto grid w-max grid-cols-[6rem_8.5rem] gap-2">
+          <button
+            className="w-full rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-3 py-1.5 text-xs font-extrabold text-[var(--accent-text)]"
+            onClick={() =>
+              setModal({
+                type: "seat-actions",
+                seat: demo.seat,
+                shift: demo.shift,
+              })
+            }
+          >
+            View
+          </button>
+          <button
+            className="w-full rounded-lg bg-[var(--brand)] px-3 py-1.5 text-xs font-extrabold text-[var(--button-text)]"
+            onClick={() =>
+              setModal({
+                type: "member",
+                seat: demo.seat,
+                shift: demo.shift,
+                demoId: demo.id,
+              })
+            }
+          >
+            Admit member
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export function MembersPage({
   data,
   shift,
@@ -153,10 +296,21 @@ export function MembersPage({
   setQuery: Dispatch<SetStateAction<string>>;
   setModal: Dispatch<SetStateAction<ModalState | null>>;
 }) {
-  const [filter, setFilter] = useState<"active" | "inactive" | "all">("active");
+  const [filter, setFilter] = useState<"active" | "demo" | "inactive" | "all">(
+    "active",
+  );
   const normalized = query.toLocaleLowerCase().trim();
   const activeCount = data.members.filter((member) => member.active).length;
   const inactiveCount = data.members.length - activeCount;
+  const demos = data.settings.trackDemoVisitors
+    ? data.demoSeats.filter((demo) =>
+        [demo.name, demo.phone, demo.seat, demo.shift, "Demo"].some((value) =>
+          String(value || "")
+            .toLocaleLowerCase()
+            .includes(normalized),
+        ),
+      )
+    : [];
   const members = data.members.filter(
     (member) =>
       (filter === "all" ||
@@ -167,9 +321,22 @@ export function MembersPage({
   );
   const counts = {
     active: activeCount,
+    demo: data.demoSeats.length,
     inactive: inactiveCount,
     all: data.members.length,
   };
+  const filters = [
+    "active",
+    ...(data.settings.trackDemoVisitors ? (["demo"] as const) : []),
+    "inactive",
+    "all",
+  ] as const;
+  const visibleCount = filter === "demo" ? demos.length : members.length;
+
+  useEffect(() => {
+    if (!data.settings.trackDemoVisitors && filter === "demo")
+      setFilter("active");
+  }, [data.settings.trackDemoVisitors, filter]);
 
   return (
     <section className="panel p-4 sm:p-6">
@@ -193,8 +360,10 @@ export function MembersPage({
             Add member
           </Button>
         </div>
-        <div className="grid grid-cols-3 rounded-xl bg-slate-100 p-1">
-          {(["active", "inactive", "all"] as const).map((item) => (
+        <div
+          className={`grid rounded-xl bg-slate-100 p-1 ${data.settings.trackDemoVisitors ? "grid-cols-4" : "grid-cols-3"}`}
+        >
+          {filters.map((item) => (
             <button
               type="button"
               key={item}
@@ -212,10 +381,14 @@ export function MembersPage({
         </div>
       </div>
       <p className="my-4 text-sm font-semibold text-slate-500">
-        {members.length} {members.length === 1 ? "record" : "records"}
+        {visibleCount} {visibleCount === 1 ? "record" : "records"}
       </p>
       <div className="grid gap-3 md:grid-cols-2 lg:hidden">
-        {members.length ? (
+        {filter === "demo" && demos.length ? (
+          demos.map((demo) => (
+            <DemoCard key={demo.id} demo={demo} setModal={setModal} />
+          ))
+        ) : filter !== "demo" && members.length ? (
           members.map((member) => (
             <MemberCard
               key={member.id}
@@ -229,9 +402,11 @@ export function MembersPage({
             <EmptyState
               title="No members found"
               text={
-                filter === "inactive"
-                  ? "Deactivated members will remain available here."
-                  : "Try a different search or filter."
+                filter === "demo"
+                  ? "Start a named demo from an available seat."
+                  : filter === "inactive"
+                    ? "Deactivated members will remain available here."
+                    : "Try a different search or filter."
               }
             />
           </div>
@@ -250,7 +425,11 @@ export function MembersPage({
             </tr>
           </thead>
           <tbody>
-            {members.length ? (
+            {filter === "demo" && demos.length ? (
+              demos.map((demo) => (
+                <DemoRow key={demo.id} demo={demo} setModal={setModal} />
+              ))
+            ) : filter !== "demo" && members.length ? (
               members.map((member) => (
                 <MemberRow
                   key={member.id}
@@ -265,9 +444,11 @@ export function MembersPage({
                   <EmptyState
                     title="No members found"
                     text={
-                      filter === "inactive"
-                        ? "Deactivated members will remain available here."
-                        : "Try a different search or filter."
+                      filter === "demo"
+                        ? "Start a named demo from an available seat."
+                        : filter === "inactive"
+                          ? "Deactivated members will remain available here."
+                          : "Try a different search or filter."
                     }
                   />
                 </td>

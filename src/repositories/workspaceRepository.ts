@@ -103,6 +103,8 @@ const demoSeatToRow = (demo: SeatDemo, libraryId: string) => ({
   library_id: libraryId,
   seat_code: demo.seat,
   shift: demo.shift,
+  visitor_name: demo.name?.trim() || null,
+  visitor_phone: demo.phone?.trim() || null,
 });
 
 const rowToMember = (row: DbRow): Member => ({
@@ -148,6 +150,8 @@ const rowToDemoSeat = (row: DbRow): SeatDemo => ({
   id: row.id,
   seat: row.seat_code,
   shift: row.shift,
+  name: row.visitor_name || undefined,
+  phone: row.visitor_phone || undefined,
 });
 
 export const isDemoUser = (user: AppUser) =>
@@ -195,6 +199,7 @@ export function normalizeWorkspace(workspace: WorkspaceData): WorkspaceData {
           : DEFAULT_FEE_COLLECTION,
       attendanceEnabled:
         workspace.settings?.attendanceEnabled ?? DEFAULT_ATTENDANCE_ENABLED,
+      trackDemoVisitors: workspace.settings?.trackDemoVisitors === true,
       primaryColor: normalizeColor(
         workspace.settings?.primaryColor,
         DEFAULT_PRIMARY_COLOR,
@@ -222,6 +227,7 @@ export function buildWorkspaceChanges(
     previous.settings.prefix !== next.settings.prefix ||
     previous.settings.feeCollection !== next.settings.feeCollection ||
     previous.settings.attendanceEnabled !== next.settings.attendanceEnabled ||
+    previous.settings.trackDemoVisitors !== next.settings.trackDemoVisitors ||
     previous.settings.primaryColor !== next.settings.primaryColor ||
     previous.settings.secondaryColor !== next.settings.secondaryColor ||
     JSON.stringify(
@@ -254,6 +260,7 @@ export function buildWorkspaceChanges(
               ? "later"
               : DEFAULT_FEE_COLLECTION,
           attendance_enabled: next.settings.attendanceEnabled === true,
+          track_demo_visitors: next.settings.trackDemoVisitors === true,
           primary_color: normalizeColor(
             next.settings.primaryColor,
             DEFAULT_PRIMARY_COLOR,
@@ -353,6 +360,7 @@ export const workspaceRepository = {
         shifts: library.shift_definitions,
         feeCollection: library.fee_collection,
         attendanceEnabled: library.attendance_enabled,
+        trackDemoVisitors: library.track_demo_visitors === true,
         primaryColor: library.primary_color,
         secondaryColor: library.secondary_color,
         isFounder: library.owner_id === user.id,
@@ -388,6 +396,7 @@ export const workspaceRepository = {
       feeCollection:
         settings.feeCollection === "later" ? "later" : DEFAULT_FEE_COLLECTION,
       attendanceEnabled: settings.attendanceEnabled === true,
+      trackDemoVisitors: settings.trackDemoVisitors === true,
       primaryColor: normalizeColor(
         settings.primaryColor,
         DEFAULT_PRIMARY_COLOR,

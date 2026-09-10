@@ -1,12 +1,7 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { ChevronDownIcon } from "../../components/ui/Icons";
 import { SearchField } from "../../components/ui/SearchField";
 import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
@@ -23,7 +18,6 @@ import {
 import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 
-const ARCHIVE_MONTH_BATCH = 3;
 const firstOfMonth = (date: string) => `${date.slice(0, 7)}-01`;
 const moveMonth = (date: string, amount: number) => {
   const value = new Date(`${firstOfMonth(date)}T12:00:00`);
@@ -54,6 +48,20 @@ const presetRange = (preset: string, today: string): [string, string] => {
 };
 const csvCell = (value: unknown) =>
   `"${String(value ?? "").replaceAll('"', '""')}"`;
+const periodLabel = (
+  period: string,
+  from: string,
+  to: string,
+  today: string,
+) => {
+  if (period === "this-month") return monthLabel(today.slice(0, 7));
+  if (period === "last-month")
+    return monthLabel(moveMonth(today, -1).slice(0, 7));
+  if (period === "this-year") return today.slice(0, 4);
+  if (period.startsWith("year-")) return period.slice(5);
+  if (period === "all") return "All time";
+  return from && to ? `${prettyDate(from)}–${prettyDate(to)}` : "Custom range";
+};
 
 export function FeesPage({
   data,
@@ -67,8 +75,6 @@ export function FeesPage({
   const [customFrom, setCustomFrom] = useState(firstOfMonth(today));
   const [customTo, setCustomTo] = useState(today);
   const [feeSearch, setFeeSearch] = useState("");
-  const [visibleMonthCount, setVisibleMonthCount] =
-    useState(ARCHIVE_MONTH_BATCH);
   const years = [
     ...new Set(data.fees.map((payment) => payment.date.slice(0, 4))),
   ]
@@ -139,6 +145,13 @@ export function FeesPage({
     (sum, payment) => sum + Number(payment.amount),
     0,
   );
+  const thisMonthPayments = data.fees.filter((payment) =>
+    payment.date.startsWith(today.slice(0, 7)),
+  );
+  const thisMonthTotal = thisMonthPayments.reduce(
+    (sum, payment) => sum + Number(payment.amount),
+    0,
+  );
   const groups = payments.reduce<Map<string, Payment[]>>((map, payment) => {
     const month = payment.date.slice(0, 7);
     map.set(month, [...(map.get(month) || []), payment]);
@@ -147,18 +160,25 @@ export function FeesPage({
   const monthlyGroups = [...groups.entries()].sort(([a], [b]) =>
     b.localeCompare(a),
   );
-  const visibleMonthlyGroups = monthlyGroups.slice(0, visibleMonthCount);
-  const remainingMonths = Math.max(
-    0,
-    monthlyGroups.length - visibleMonthlyGroups.length,
-  );
-  const average = monthlyGroups.length
-    ? Math.round(filteredTotal / monthlyGroups.length)
-    : 0;
-
-  useEffect(() => {
-    setVisibleMonthCount(ARCHIVE_MONTH_BATCH);
-  }, [feeSearch, period, customFrom, customTo]);
+  const yearlyGroups = [
+    ...monthlyGroups.reduce<Map<string, Array<[string, Payment[]]>>>(
+      (map, group) => {
+        const year = group[0].slice(0, 4);
+        map.set(year, [...(map.get(year) || []), group]);
+        return map;
+      },
+      new Map(),
+    ),
+  ].sort(([first], [second]) => second.localeCompare(first));
+  const currentYear = today.slice(0, 4);
+  const activeFilter =
+    period !== "this-month" || Boolean(feeSearch.trim()) || invalidRange;
+  const filteredLabel = periodLabel(period, from, to, today);
+  const yearStartsOpen = (year: string) =>
+    Boolean(feeSearch.trim()) ||
+    period === `year-${year}` ||
+    (period !== "all" && yearlyGroups.length === 1) ||
+    year === currentYear;
 
   function downloadReport() {
     if (!payments.length || invalidRange) return;
@@ -196,7 +216,7 @@ export function FeesPage({
 
   return (
     <section className="grid gap-5">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid max-w-3xl gap-3 sm:grid-cols-2">
         {[
           [
             "Collected till date",
@@ -204,22 +224,19 @@ export function FeesPage({
             `${data.fees.length} lifetime payments`,
           ],
           [
-            "Selected period",
-            money(filteredTotal),
-            `${payments.length} payments`,
-          ],
-          [
-            "Active-month average",
-            money(average),
-            `${monthlyGroups.length} months with collections`,
+            "Collected this month",
+            money(thisMonthTotal),
+            `${thisMonthPayments.length} ${thisMonthPayments.length === 1 ? "payment" : "payments"}`,
           ],
         ].map(([label, value, note], index) => (
           <article
             key={label}
-            className={`rounded-[1.35rem] border-2 p-5 ${["border-indigo-200 bg-indigo-50/70", "border-emerald-200 bg-emerald-50/70", "status-warning-surface"][index]}`}
+            className={`rounded-[1.2rem] border-2 p-3.5 sm:p-4 ${["border-indigo-200 bg-indigo-50/70", "border-emerald-200 bg-emerald-50/70"][index]}`}
           >
-            <span className="text-sm font-bold text-slate-600">{label}</span>
-            <strong className="mt-2 block font-display text-3xl text-slate-900">
+            <span className="text-xs font-bold text-slate-600 sm:text-sm">
+              {label}
+            </span>
+            <strong className="mt-1.5 block font-display text-2xl text-slate-900">
               {value}
             </strong>
             <small className="mt-1 block text-slate-600">{note}</small>
@@ -286,10 +303,10 @@ export function FeesPage({
               <div>
                 <h2>Collection archive</h2>
                 <p>Monthly totals and payment records</p>
-                {monthlyGroups.length > ARCHIVE_MONTH_BATCH && (
-                  <small className="mt-1 block font-semibold text-slate-500">
-                    Showing {visibleMonthlyGroups.length} of{" "}
-                    {monthlyGroups.length} months
+                {activeFilter && !invalidRange && (
+                  <small className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-600">
+                    {filteredLabel} · {money(filteredTotal)} · {payments.length}{" "}
+                    {payments.length === 1 ? "payment" : "payments"}
                   </small>
                 )}
               </div>
@@ -363,124 +380,151 @@ export function FeesPage({
             )}
           </div>
           <div className="border-t border-slate-200">
-            {monthlyGroups.length ? (
-              <>
-                {visibleMonthlyGroups.map(([month, monthPayments], index) => (
+            {yearlyGroups.length ? (
+              yearlyGroups.map(([year, yearMonths]) => {
+                const yearPayments = yearMonths.flatMap(([, items]) => items);
+                const yearTotal = yearPayments.reduce(
+                  (sum, payment) => sum + payment.amount,
+                  0,
+                );
+                return (
                   <details
-                    key={month}
-                    open={index === 0}
-                    className="border-b border-slate-200 last:border-0"
+                    key={year}
+                    open={yearStartsOpen(year)}
+                    className="archive-disclosure archive-year border-b border-slate-200 last:border-0"
                   >
-                    <summary className="flex cursor-pointer items-center justify-between gap-3 bg-slate-50 p-4 marker:text-slate-500 transition hover:bg-slate-100 sm:px-6">
-                      <span>
-                        <strong className="inline-flex rounded-lg bg-[var(--accent)] px-2.5 py-1 text-[var(--accent-text)]">
-                          {monthLabel(month)}
-                        </strong>
-                        <small className="text-slate-500">
-                          <span className="mt-1.5 block">
-                            {monthPayments.length} payments · Select to expand
-                          </span>
-                        </small>
+                    <summary className="flex cursor-pointer items-center justify-between gap-3 bg-slate-100 px-4 py-3.5 transition hover:bg-slate-200/70 sm:px-5">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
+                        <span>
+                          <strong className="block font-display text-xl text-slate-900">
+                            {year}
+                          </strong>
+                          <small className="text-slate-500">
+                            {yearMonths.length}{" "}
+                            {yearMonths.length === 1 ? "month" : "months"} ·{" "}
+                            {yearPayments.length}{" "}
+                            {yearPayments.length === 1 ? "payment" : "payments"}
+                          </small>
+                        </span>
                       </span>
-                      <b>
-                        {money(
-                          monthPayments.reduce(
-                            (sum, item) => sum + item.amount,
-                            0,
-                          ),
-                        )}
+                      <b className="whitespace-nowrap text-slate-900">
+                        {money(yearTotal)}
                       </b>
                     </summary>
-                    <div className="grid gap-px bg-slate-200">
-                      {monthPayments.map((payment) => {
-                        const deletable =
-                          daysSince(payment.date) >= 0 &&
-                          daysSince(payment.date) <= PAYMENT_EDIT_REVIEW_DAYS;
-                        const member = data.members.find(
-                          (item) => item.id === payment.memberId,
+                    <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2.5 sm:p-3">
+                      {yearMonths.map(([month, monthPayments]) => {
+                        const monthTotal = monthPayments.reduce(
+                          (sum, payment) => sum + payment.amount,
+                          0,
                         );
                         return (
-                          <div
-                            className="grid gap-3 bg-white p-4 sm:grid-cols-[1fr_auto] sm:px-6"
-                            key={payment.id}
+                          <details
+                            key={month}
+                            open={Boolean(feeSearch.trim())}
+                            className="archive-disclosure archive-month ml-2 rounded-xl border border-slate-200 bg-white sm:ml-4"
                           >
-                            <div>
-                              <strong>
-                                {payment.memberName || member?.name || "Member"}
-                                {member?.phone && (
-                                  <span className="whitespace-nowrap font-semibold text-slate-600">
-                                    {" "}
-                                    ({member.phone})
-                                  </span>
-                                )}
-                              </strong>
-                              <small className="mt-1 block text-slate-600">
-                                {prettyDate(payment.date)} ·{" "}
-                                {payment.seat ||
-                                  member?.seat ||
-                                  "Seat not recorded"}{" "}
-                                · {payment.mode}
-                              </small>
-                              <small className="block text-slate-500">
-                                Covers {prettyDate(payment.periodStart)}–
-                                {prettyDate(payment.periodEnd)}
-                              </small>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
-                              <b>{money(payment.amount)}</b>
-                              <span className="flex gap-2 sm:mt-2">
-                                <button
-                                  className="text-xs font-extrabold text-slate-700 underline"
-                                  onClick={() =>
-                                    setModal({
-                                      type: "payment-edit",
-                                      id: payment.id,
-                                    })
-                                  }
-                                >
-                                  Edit
-                                </button>
-                                {deletable ? (
-                                  <button
-                                    className="status-danger-text text-xs font-extrabold underline"
-                                    onClick={() =>
-                                      setModal({
-                                        type: "payment-delete",
-                                        id: payment.id,
-                                      })
-                                    }
-                                  >
-                                    Delete
-                                  </button>
-                                ) : (
-                                  <small className="font-semibold text-slate-400">
-                                    Delete locked
+                            <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-xl p-3 transition hover:bg-slate-50 sm:px-4">
+                              <span className="flex min-w-0 items-center gap-2.5">
+                                <ChevronDownIcon className="archive-chevron size-4 shrink-0 text-slate-500" />
+                                <span>
+                                  <strong className="block text-sm text-slate-900 sm:text-base">
+                                    {monthLabel(month)}
+                                  </strong>
+                                  <small className="text-slate-500">
+                                    {monthPayments.length}{" "}
+                                    {monthPayments.length === 1
+                                      ? "payment"
+                                      : "payments"}
                                   </small>
-                                )}
+                                </span>
                               </span>
+                              <b className="whitespace-nowrap text-sm text-slate-900 sm:text-base">
+                                {money(monthTotal)}
+                              </b>
+                            </summary>
+                            <div className="ml-3 grid gap-px border-l border-slate-200 bg-slate-200 sm:ml-5">
+                              {monthPayments.map((payment) => {
+                                const deletable =
+                                  daysSince(payment.date) >= 0 &&
+                                  daysSince(payment.date) <=
+                                    PAYMENT_EDIT_REVIEW_DAYS;
+                                const member = data.members.find(
+                                  (item) => item.id === payment.memberId,
+                                );
+                                return (
+                                  <div
+                                    className="grid gap-3 bg-white p-3 sm:grid-cols-[1fr_auto] sm:p-4"
+                                    key={payment.id}
+                                  >
+                                    <div>
+                                      <strong>
+                                        {payment.memberName ||
+                                          member?.name ||
+                                          "Member"}
+                                        {member?.phone && (
+                                          <span className="whitespace-nowrap font-semibold text-slate-600">
+                                            {" "}
+                                            ({member.phone})
+                                          </span>
+                                        )}
+                                      </strong>
+                                      <small className="mt-1 block text-slate-600">
+                                        {prettyDate(payment.date)} ·{" "}
+                                        {payment.seat ||
+                                          member?.seat ||
+                                          "Seat not recorded"}{" "}
+                                        · {payment.mode}
+                                      </small>
+                                      <small className="block text-slate-500">
+                                        Covers {prettyDate(payment.periodStart)}
+                                        –{prettyDate(payment.periodEnd)}
+                                      </small>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+                                      <b>{money(payment.amount)}</b>
+                                      <span className="flex gap-2 sm:mt-2">
+                                        <button
+                                          className="text-xs font-extrabold text-slate-700 underline"
+                                          onClick={() =>
+                                            setModal({
+                                              type: "payment-edit",
+                                              id: payment.id,
+                                            })
+                                          }
+                                        >
+                                          Edit
+                                        </button>
+                                        {deletable ? (
+                                          <button
+                                            className="status-danger-text text-xs font-extrabold underline"
+                                            onClick={() =>
+                                              setModal({
+                                                type: "payment-delete",
+                                                id: payment.id,
+                                              })
+                                            }
+                                          >
+                                            Delete
+                                          </button>
+                                        ) : (
+                                          <small className="font-semibold text-slate-400">
+                                            Delete locked
+                                          </small>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </div>
+                          </details>
                         );
                       })}
                     </div>
                   </details>
-                ))}
-                {remainingMonths > 0 && (
-                  <div className="border-t border-slate-200 p-4 sm:px-6">
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() =>
-                        setVisibleMonthCount(
-                          (current) => current + ARCHIVE_MONTH_BATCH,
-                        )
-                      }
-                    >
-                      Show older months · {remainingMonths} remaining
-                    </Button>
-                  </div>
-                )}
-              </>
+                );
+              })
             ) : (
               <div className="p-5">
                 <EmptyState
@@ -498,10 +542,6 @@ export function FeesPage({
               </div>
             )}
           </div>
-          <p className="helper p-4 sm:px-6">
-            Every payment can be corrected. Payments older than 4 days show an
-            extra warning; deletion remains limited to recent records.
-          </p>
         </article>
       </div>
     </section>

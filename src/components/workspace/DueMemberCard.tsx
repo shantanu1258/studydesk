@@ -19,7 +19,7 @@ export function DueMemberCard({
 
   return (
     <article
-      className={`rounded-2xl border p-4 ${status.tone === "overdue" ? "status-danger-surface" : "status-warning-surface"}`}
+      className={`rounded-2xl border p-3 ${status.tone === "overdue" ? "status-danger-surface" : "status-warning-surface"}`}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-base font-extrabold leading-snug text-slate-900">
@@ -33,7 +33,7 @@ export function DueMemberCard({
         </StatusPill>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-black/5 bg-white/65 p-3 sm:grid-cols-3">
+      <dl className="mt-2.5 grid grid-cols-2 gap-2.5 rounded-xl border border-black/5 bg-white/65 p-2.5 sm:grid-cols-3">
         <div>
           <dt className="text-[10px] font-extrabold tracking-[0.12em] text-slate-500 uppercase">
             Seat
@@ -60,7 +60,7 @@ export function DueMemberCard({
         </div>
       </dl>
 
-      <Button className="mt-3 w-full" onClick={onCollect}>
+      <Button className="mt-2.5 w-full" onClick={onCollect}>
         {hasPayment ? "Collect fee" : "Add payment"}
       </Button>
     </article>

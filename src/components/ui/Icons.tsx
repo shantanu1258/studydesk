@@ -109,6 +109,11 @@ export const ArrowLeftIcon = (props: IconProps) => (
     <path d="m10 6-6 6 6 6M4 12h16" />
   </Icon>
 );
+export const ChevronDownIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+);
 export const AlertIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M10.3 3.6 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" />
@@ -122,6 +127,11 @@ export const SeatIcon = (props: IconProps) => (
 export const RupeeIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M6 4h12M6 8h12M7 4c6 0 7 8 0 8h-1l9 8" />
+  </Icon>
+);
+export const PhoneIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M7.2 3.5 9.6 7a1.5 1.5 0 0 1-.2 1.9l-1.2 1.2a14.2 14.2 0 0 0 5.7 5.7l1.2-1.2a1.5 1.5 0 0 1 1.9-.2l3.5 2.4a1.5 1.5 0 0 1 .6 1.7l-.5 2a2 2 0 0 1-2 1.5C9.4 21.5 2.5 14.6 2 5.4a2 2 0 0 1 1.5-2l2-.5a1.5 1.5 0 0 1 1.7.6Z" />
   </Icon>
 );
 export const SunIcon = (props: IconProps) => (

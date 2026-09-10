@@ -121,21 +121,25 @@ export function SeatGrid({
               member
                 ? `${member.name} · ${paymentStatus?.label}`
                 : demo
-                  ? `Demo · ${demo.shift}`
+                  ? `${demo.name || "Demo"} · ${demo.shift}`
                   : "Available"
             }
             aria-label={
               member
                 ? `${seat}, ${member.name}, ${paymentStatus?.label}`
                 : demo
-                  ? `${seat}, demo, ${demo.shift}`
+                  ? `${seat}, ${demo.name || "demo"}, demo, ${demo.shift}`
                   : `${seat}, available`
             }
           >
             <span className="block text-sm font-extrabold">{seat}</span>
             {!compact && (
               <small className="mt-0.5 block truncate text-xs font-semibold opacity-75">
-                {member ? member.name.split(" ")[0] : demo ? "Demo" : "Free"}
+                {member
+                  ? member.name.split(" ")[0]
+                  : demo
+                    ? demo.name?.split(" ")[0] || "Demo"
+                    : "Free"}
               </small>
             )}
           </button>

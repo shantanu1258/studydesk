@@ -6,7 +6,7 @@ StudyDesk is a Vite-built static React frontend backed by Supabase. There is no 
 
 1. Sign in at [supabase.com](https://supabase.com) and create a new project.
 2. Choose the region closest to the library and save the database password somewhere private.
-3. Open **SQL Editor**, create a query, and run the files in `supabase/migrations/` in number order. Existing projects should run every migration they have not applied yet, including `004_demo_seats_and_fee_controls.sql`.
+3. Open **SQL Editor**, create a query, paste the complete `supabase/studydesk.sql` file, and run it once. Existing projects that already applied the former numbered migrations do not need to run it again.
 4. Open **Project Settings → API** and copy:
    - Project URL
    - Publishable key (a legacy `anon` key also works)

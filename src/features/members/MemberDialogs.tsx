@@ -8,6 +8,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog, Modal, ModalHeader } from "../../components/ui/Modal";
+import { PhoneLink } from "../../components/ui/PhoneLink";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { statusSurfaceStyles } from "../../components/workspace/memberStatusStyles";
 import { PAYMENT_EDIT_REVIEW_DAYS } from "../../config/constants";
@@ -34,6 +35,7 @@ import {
   findMemberByPhone,
   findOverlappingPayment,
   memberStatus,
+  normalizeMemberPhone,
 } from "../../utils/members";
 import { defaultFeeForSeat, seatCodes } from "../../utils/seats";
 import {
@@ -44,6 +46,7 @@ import {
 } from "../../utils/shifts";
 
 const DURATION_OPTIONS = [1, 2, 3, 6, 12];
+const CUSTOM_DURATION = "custom";
 const PAYMENT_MODES: PaymentMode[] = ["UPI", "Cash", "Card", "Bank transfer"];
 type Values = Record<string, string>;
 const valuesFrom = (form: HTMLFormElement): Values =>
@@ -59,6 +62,7 @@ function DurationOptions() {
           {months} {months === 1 ? "month" : "months"}
         </option>
       ))}
+      <option value={CUSTOM_DURATION}>Custom end date</option>
     </>
   );
 }
@@ -96,9 +100,35 @@ function PaymentAmountSummary({
   );
 }
 
+const endForDuration = (start: string, duration: string, customEnd?: string) =>
+  duration === CUSTOM_DURATION
+    ? customEnd || start
+    : addMonths(start, Number(duration) || 1);
+
+const monthsForStorage = (
+  start: string,
+  duration: string,
+  customEnd?: string,
+) =>
+  duration === CUSTOM_DURATION
+    ? monthsBetween(start, customEnd) || 1
+    : Number(duration) || 1;
+
+const durationSelection = (start: string, end: string, months?: number) => {
+  const storedMonths = months || monthsBetween(start, end);
+  return addMonths(start, storedMonths) === end
+    ? String(storedMonths)
+    : CUSTOM_DURATION;
+};
+
 function paymentFrom(member: Member, values: Values): Payment {
-  const periodMonths = Number(values.months) || 1;
   const periodStart = values.periodStart || values.start;
+  const periodEnd = endForDuration(
+    periodStart,
+    values.months,
+    values.periodEnd,
+  );
+  const periodMonths = monthsForStorage(periodStart, values.months, periodEnd);
   return {
     id: uid(),
     memberId: member.id,
@@ -109,7 +139,7 @@ function paymentFrom(member: Member, values: Values): Payment {
     mode: (values.paymentMode ?? values.mode) as PaymentMode,
     periodStart,
     periodMonths,
-    periodEnd: addMonths(periodStart, periodMonths),
+    periodEnd,
   };
 }
 
@@ -146,8 +176,10 @@ function SeatActionsDialog({
   setModal: Dispatch<SetStateAction<ModalState | null>>;
 }) {
   const [saving, setSaving] = useState(false);
+  const [showDemoForm, setShowDemoForm] = useState(false);
+  const [error, setError] = useState("");
   const demos = demosForSeat(data, seat, selectedShift);
-  const isDemo = demos.length > 0;
+  const demo = demos[0];
   const member = data.members.find(
     (item) =>
       item.active &&
@@ -157,29 +189,71 @@ function SeatActionsDialog({
   const selected = configuredShifts(data.settings).find(
     (item) => item.name === selectedShift,
   );
+  const availableSeats = seatCodes(data.settings);
+  const occupiedAt = (targetSeat: string) =>
+    data.members.find(
+      (item) =>
+        item.active &&
+        item.seat === targetSeat &&
+        shiftsOverlap(data.settings.shifts, item.shift, selectedShift),
+    );
+  const demoAt = (targetSeat: string) =>
+    data.demoSeats.find(
+      (item) =>
+        item.seat === targetSeat &&
+        shiftsOverlap(data.settings.shifts, item.shift, selectedShift),
+    );
 
-  async function changeDemo(start: boolean) {
+  async function startDemo(values?: Values) {
+    const targetSeat = values?.seat || seat;
+    const name = values?.name?.trim();
+    const phone = values?.phone?.trim();
+    const occupied = occupiedAt(targetSeat);
+    if (occupied) {
+      setError(`${targetSeat} is already assigned to ${occupied.name}.`);
+      return;
+    }
+    const existingDemo = demoAt(targetSeat);
+    if (existingDemo) {
+      setError(`${targetSeat} is already being used for another demo.`);
+      return;
+    }
+    if (phone) {
+      const activeMember = findMemberByPhone(data.members, phone);
+      if (activeMember?.active) {
+        setError(
+          `${phone} already belongs to ${activeMember.name}, active in ${activeMember.seat}.`,
+        );
+        return;
+      }
+      const duplicateDemo = data.demoSeats.find(
+        (item) =>
+          item.phone &&
+          normalizeMemberPhone(item.phone) === normalizeMemberPhone(phone),
+      );
+      if (duplicateDemo) {
+        setError(
+          `${phone} is already in demo at ${duplicateDemo.seat} for ${duplicateDemo.shift}.`,
+        );
+        return;
+      }
+    }
+    setError("");
     setSaving(true);
     try {
       const saved = await commit(
         (next) => {
-          if (start) {
-            if (
-              !next.demoSeats.some(
-                (demo) => demo.seat === seat && demo.shift === selectedShift,
-              )
-            ) {
-              next.demoSeats.push({ id: uid(), seat, shift: selectedShift });
-            }
-          } else {
-            next.demoSeats = next.demoSeats.filter(
-              (demo) =>
-                demo.seat !== seat ||
-                !shiftsOverlap(next.settings.shifts, demo.shift, selectedShift),
-            );
-          }
+          next.demoSeats.push({
+            id: uid(),
+            seat: targetSeat,
+            shift: selectedShift,
+            name,
+            phone,
+          });
         },
-        start ? `${seat} started a demo` : `${seat} demo stopped`,
+        name
+          ? `${name} started a demo in ${targetSeat}`
+          : `${targetSeat} started a demo`,
       );
       if (saved) close();
     } finally {
@@ -187,12 +261,43 @@ function SeatActionsDialog({
     }
   }
 
+  async function stopDemo() {
+    setSaving(true);
+    try {
+      const saved = await commit((next) => {
+        next.demoSeats = next.demoSeats.filter(
+          (item) =>
+            item.seat !== seat ||
+            !shiftsOverlap(next.settings.shifts, item.shift, selectedShift),
+        );
+      }, `${seat} demo stopped`);
+      if (saved) close();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <Modal onClose={close}>
+    <Modal onClose={close} fixedLayout={showDemoForm}>
       <ModalHeader
-        eyebrow="Seat options"
-        title={seat}
-        text={`${selectedShift}${selected ? ` · ${shiftTiming(selected)}` : ""}`}
+        eyebrow={demo?.name ? "Demo visitor" : "Seat options"}
+        title={demo?.name || seat}
+        text={
+          demo?.phone ? (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span>
+                {demo.phone} · {demo.seat} · {demo.shift}
+              </span>
+              <PhoneLink
+                phone={demo.phone}
+                name={demo.name || "Demo visitor"}
+                className="!size-7"
+              />
+            </span>
+          ) : (
+            `${selectedShift}${selected ? ` · ${shiftTiming(selected)}` : ""}`
+          )
+        }
         onClose={close}
       />
       {member ? (
@@ -210,21 +315,132 @@ function SeatActionsDialog({
             </Button>
           </div>
         </>
+      ) : demo ? (
+        <>
+          <div className="status-demo-surface rounded-2xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <strong className="block text-slate-900">
+                  {demo.name || "Anonymous demo"}
+                </strong>
+                <small className="text-slate-600">
+                  {demo.seat} · {demo.shift}
+                </small>
+              </div>
+              <StatusPill tone="demo">Demo</StatusPill>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <Button
+              variant="secondary"
+              disabled={saving}
+              loading={saving}
+              onClick={() => void stopDemo()}
+            >
+              Stop demo
+            </Button>
+            <Button
+              disabled={saving}
+              onClick={() =>
+                setModal({
+                  type: "member",
+                  seat: demo.seat,
+                  shift: demo.shift,
+                  demoId: demo.id,
+                })
+              }
+            >
+              Admit member
+            </Button>
+          </div>
+        </>
+      ) : showDemoForm ? (
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void startDemo(valuesFrom(event.currentTarget));
+          }}
+        >
+          <div className="member-form-fields min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pr-1">
+            <label>
+              Full name
+              <input
+                name="name"
+                autoFocus
+                required
+                maxLength={120}
+                placeholder="Visitor name"
+              />
+            </label>
+            <label>
+              Phone number
+              <input
+                name="phone"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                required
+                placeholder="10-digit number"
+              />
+            </label>
+            <label>
+              Demo seat
+              <select name="seat" defaultValue={seat}>
+                {availableSeats.map((option) => {
+                  const occupied = occupiedAt(option);
+                  const existingDemo = demoAt(option);
+                  return (
+                    <option
+                      key={option}
+                      value={option}
+                      disabled={Boolean(occupied || existingDemo)}
+                    >
+                      {option}
+                      {occupied
+                        ? ` — occupied by ${occupied.name}`
+                        : existingDemo
+                          ? " — already in demo"
+                          : option === seat
+                            ? " — selected"
+                            : " — available"}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            {error && <p className="field-error">{error}</p>}
+          </div>
+          <div className="modal-fixed-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={saving}
+              onClick={() => setShowDemoForm(false)}
+            >
+              Back
+            </Button>
+            <Button type="submit" loading={saving}>
+              Start demo
+            </Button>
+          </div>
+        </form>
       ) : (
         <>
           <p className="modal-note">
-            {isDemo
-              ? "This seat is being shown to a prospective member and remains unavailable until an admin stops the demo."
-              : "Start a demo to hold this seat temporarily, or assign it to a new member."}
+            Start a demo to hold this seat, or assign it directly to a member.
           </p>
           <div className="modal-actions">
             <Button
               variant="secondary"
               disabled={saving}
               loading={saving}
-              onClick={() => void changeDemo(!isDemo)}
+              onClick={() =>
+                data.settings.trackDemoVisitors
+                  ? setShowDemoForm(true)
+                  : void startDemo()
+              }
             >
-              {isDemo ? "Stop demo" : "Start demo"}
+              Start demo
             </Button>
             <Button
               disabled={saving}
@@ -257,6 +473,10 @@ function MemberFormDialog({
     modal.type === "member-reactivate"
       ? data.members.find((member) => member.id === modal.id)
       : undefined;
+  const sourceDemo =
+    modal.type === "member" && modal.demoId
+      ? data.demoSeats.find((demo) => demo.id === modal.demoId)
+      : undefined;
   const [error, setError] = useState("");
   const [recordPayment, setRecordPayment] = useState(
     data.settings.feeCollection !== "later",
@@ -273,22 +493,43 @@ function MemberFormDialog({
   const collectInAdvance = data.settings.feeCollection !== "later";
   const defaultShift =
     reactivation?.shift ||
+    sourceDemo?.shift ||
     (modal.type === "member" ? modal.shift : "") ||
     shift;
   const defaultSeat =
     reactivation?.seat ||
+    sourceDemo?.seat ||
     (modal.type === "member" ? modal.seat : "") ||
     seats[0];
   const initialFee =
     reactivation?.fee ?? defaultFeeForSeat(data.settings, defaultSeat);
   const initialPlanMonths = reactivation?.planMonths || 1;
+  const initialPlanStart = reactivation?.planStart || localDate();
+  const initialDuration = reactivation
+    ? durationSelection(
+        initialPlanStart,
+        reactivation.expiry,
+        initialPlanMonths,
+      )
+    : String(initialPlanMonths);
   const [memberFee, setMemberFee] = useState<number | string>(initialFee);
-  const [planMonths, setPlanMonths] = useState<number | string>(
-    initialPlanMonths,
+  const [planDuration, setPlanDuration] = useState(initialDuration);
+  const [planStart, setPlanStart] = useState(initialPlanStart);
+  const [customPlanEnd, setCustomPlanEnd] = useState(
+    reactivation?.expiry || addMonths(initialPlanStart, initialPlanMonths),
+  );
+  const [firstPaymentAmount, setFirstPaymentAmount] = useState<number | string>(
+    initialFee * initialPlanMonths,
   );
 
   async function save(values: Values, existing = reactivation) {
     const shouldRecordPayment = collectInAdvance && recordPayment;
+    const expiry = endForDuration(
+      values.start,
+      values.months,
+      values.periodEnd,
+    );
+    const planMonths = monthsForStorage(values.start, values.months, expiry);
     setSaving(true);
     try {
       const saved = await commit(
@@ -304,8 +545,8 @@ function MemberFormDialog({
               shift: values.shift,
               fee: Number(values.fee),
               planStart: values.start,
-              planMonths: Number(values.months),
-              expiry: addMonths(values.start, values.months),
+              planMonths,
+              expiry,
               active: true,
             });
           else {
@@ -318,8 +559,8 @@ function MemberFormDialog({
               fee: Number(values.fee),
               start: values.start,
               planStart: values.start,
-              planMonths: Number(values.months),
-              expiry: addMonths(values.start, values.months),
+              planMonths,
+              expiry,
               active: true,
             };
             next.members.push(target);
@@ -330,8 +571,9 @@ function MemberFormDialog({
             );
           next.demoSeats = next.demoSeats.filter(
             (demo) =>
-              demo.seat !== values.seat ||
-              !shiftsOverlap(next.settings.shifts, demo.shift, values.shift),
+              demo.id !== sourceDemo?.id &&
+              (demo.seat !== values.seat ||
+                !shiftsOverlap(next.settings.shifts, demo.shift, values.shift)),
           );
         },
         shouldRecordPayment
@@ -352,6 +594,15 @@ function MemberFormDialog({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = valuesFrom(event.currentTarget);
+    const periodEnd = endForDuration(
+      values.start,
+      values.months,
+      values.periodEnd,
+    );
+    if (!periodEnd || periodEnd <= values.start) {
+      setError("The membership end date must be after its start date.");
+      return;
+    }
     const phoneMatch = findMemberByPhone(
       data.members,
       values.phone,
@@ -384,7 +635,6 @@ function MemberFormDialog({
     }
     setError("");
     if (existing || !(collectInAdvance && recordPayment)) {
-      const periodEnd = addMonths(values.start, values.months);
       const overlap =
         existing && collectInAdvance && recordPayment
           ? findOverlappingPayment(
@@ -404,9 +654,19 @@ function MemberFormDialog({
     <>
       <Modal onClose={close} fixedLayout>
         <ModalHeader
-          eyebrow={reactivation ? "Reactivate member" : "New admission"}
+          eyebrow={
+            reactivation
+              ? "Reactivate member"
+              : sourceDemo
+                ? "Demo admission"
+                : "New admission"
+          }
           title={
-            reactivation ? `Welcome back, ${reactivation.name}` : "Add a member"
+            reactivation
+              ? `Welcome back, ${reactivation.name}`
+              : sourceDemo?.name
+                ? `Admit ${sourceDemo.name}`
+                : "Add a member"
           }
           text="Assign a plan and seat. Membership dates can be corrected later."
           onClose={close}
@@ -421,7 +681,7 @@ function MemberFormDialog({
                   autoFocus
                   required
                   maxLength={120}
-                  defaultValue={reactivation?.name || ""}
+                  defaultValue={reactivation?.name || sourceDemo?.name || ""}
                   placeholder="Member name"
                 />
               </label>
@@ -432,7 +692,7 @@ function MemberFormDialog({
                   inputMode="numeric"
                   pattern="[0-9]{10}"
                   required
-                  defaultValue={reactivation?.phone || ""}
+                  defaultValue={reactivation?.phone || sourceDemo?.phone || ""}
                   placeholder="10-digit number"
                 />
               </label>
@@ -476,7 +736,14 @@ function MemberFormDialog({
                   type="number"
                   min={0}
                   value={memberFee}
-                  onChange={(event) => setMemberFee(event.target.value)}
+                  onChange={(event) => {
+                    const fee = event.target.value;
+                    setMemberFee(fee);
+                    if (planDuration !== CUSTOM_DURATION)
+                      setFirstPaymentAmount(
+                        Number(fee) * (Number(planDuration) || 1),
+                      );
+                  }}
                   required
                 />
               </label>
@@ -484,8 +751,17 @@ function MemberFormDialog({
                 Plan duration
                 <select
                   name="months"
-                  value={planMonths}
-                  onChange={(event) => setPlanMonths(event.target.value)}
+                  value={planDuration}
+                  onChange={(event) => {
+                    const duration = event.target.value;
+                    setPlanDuration(duration);
+                    if (duration !== CUSTOM_DURATION)
+                      setFirstPaymentAmount(
+                        Number(memberFee) * (Number(duration) || 1),
+                      );
+                    else if (customPlanEnd <= planStart)
+                      setCustomPlanEnd(addMonths(planStart, 1));
+                  }}
                 >
                   <DurationOptions />
                 </select>
@@ -496,10 +772,29 @@ function MemberFormDialog({
               <input
                 name="start"
                 type="date"
-                defaultValue={localDate()}
+                value={planStart}
+                onChange={(event) => {
+                  const start = event.target.value;
+                  setPlanStart(start);
+                  if (customPlanEnd <= start)
+                    setCustomPlanEnd(addMonths(start, 1));
+                }}
                 required
               />
             </label>
+            {planDuration === CUSTOM_DURATION && (
+              <label>
+                Membership period ends
+                <input
+                  name="periodEnd"
+                  type="date"
+                  min={planStart}
+                  value={customPlanEnd}
+                  onChange={(event) => setCustomPlanEnd(event.target.value)}
+                  required
+                />
+              </label>
+            )}
             {collectInAdvance && (
               <label className="flex cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-2xl bg-slate-100 p-3.5">
                 <input
@@ -523,10 +818,26 @@ function MemberFormDialog({
                   First payment
                 </legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <PaymentAmountSummary
-                    monthlyFee={Number(memberFee) || 0}
-                    months={Number(planMonths) || 1}
-                  />
+                  {planDuration === CUSTOM_DURATION ? (
+                    <label>
+                      Amount received (₹)
+                      <input
+                        name="amount"
+                        type="number"
+                        min={0}
+                        value={firstPaymentAmount}
+                        onChange={(event) =>
+                          setFirstPaymentAmount(event.target.value)
+                        }
+                        required
+                      />
+                    </label>
+                  ) : (
+                    <PaymentAmountSummary
+                      monthlyFee={Number(memberFee) || 0}
+                      months={Number(planDuration) || 1}
+                    />
+                  )}
                   <label>
                     Payment mode
                     <select name="paymentMode">
@@ -600,6 +911,7 @@ function RenewDialog({
   close,
 }: CommonProps & { member: Member }) {
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [pendingPayment, setPendingPayment] = useState<Payment | null>(null);
   const payments = data.fees.filter(
     (payment) => payment.memberId === member.id,
@@ -612,9 +924,16 @@ function RenewDialog({
       ? member.expiry
       : localDate();
   const defaultMonths = paymentDue ? member.planMonths || 1 : 1;
+  const defaultDuration = paymentDue
+    ? durationSelection(defaultStart, member.expiry, defaultMonths)
+    : String(defaultMonths);
   const seatRangeRate = defaultFeeForSeat(data.settings, member.seat);
-  const [periodMonths, setPeriodMonths] = useState<number | string>(
-    defaultMonths,
+  const [periodDuration, setPeriodDuration] = useState(defaultDuration);
+  const [periodStart, setPeriodStart] = useState(defaultStart);
+  const [customPeriodEnd, setCustomPeriodEnd] = useState(
+    paymentDue && defaultDuration === CUSTOM_DURATION
+      ? member.expiry
+      : addMonths(defaultStart, defaultMonths),
   );
   const [paymentAmount, setPaymentAmount] = useState<number | string>(
     seatRangeRate * defaultMonths,
@@ -641,7 +960,18 @@ function RenewDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const payment = paymentFrom(member, valuesFrom(event.currentTarget));
+    const values = valuesFrom(event.currentTarget);
+    const periodEnd = endForDuration(
+      values.periodStart,
+      values.months,
+      values.periodEnd,
+    );
+    if (!periodEnd || periodEnd <= values.periodStart) {
+      setError("The covered period must end after it starts.");
+      return;
+    }
+    setError("");
+    const payment = paymentFrom(member, values);
     const overlap = findOverlappingPayment(
       data.fees,
       member.id,
@@ -730,7 +1060,13 @@ function RenewDialog({
                   <input
                     name="periodStart"
                     type="date"
-                    defaultValue={defaultStart}
+                    value={periodStart}
+                    onChange={(event) => {
+                      const start = event.target.value;
+                      setPeriodStart(start);
+                      if (customPeriodEnd <= start)
+                        setCustomPeriodEnd(addMonths(start, 1));
+                    }}
                     required
                   />
                 </label>
@@ -738,19 +1074,39 @@ function RenewDialog({
                   Duration
                   <select
                     name="months"
-                    value={periodMonths}
+                    value={periodDuration}
                     onChange={(event) => {
-                      setPeriodMonths(event.target.value);
-                      setPaymentAmount(
-                        seatRangeRate * (Number(event.target.value) || 1),
-                      );
+                      const duration = event.target.value;
+                      setPeriodDuration(duration);
+                      if (duration !== CUSTOM_DURATION)
+                        setPaymentAmount(
+                          seatRangeRate * (Number(duration) || 1),
+                        );
+                      else if (customPeriodEnd <= periodStart)
+                        setCustomPeriodEnd(addMonths(periodStart, 1));
                     }}
                   >
                     <DurationOptions />
                   </select>
                 </label>
+                {periodDuration === CUSTOM_DURATION && (
+                  <label className="sm:col-span-2">
+                    Period ends
+                    <input
+                      name="periodEnd"
+                      type="date"
+                      min={periodStart}
+                      value={customPeriodEnd}
+                      onChange={(event) =>
+                        setCustomPeriodEnd(event.target.value)
+                      }
+                      required
+                    />
+                  </label>
+                )}
               </div>
             </fieldset>
+            {error && <p className="field-error">{error}</p>}
             <p className="modal-note !p-3.5">
               A period ending before a later recorded plan is archived without
               shortening the current validity.
@@ -798,19 +1154,41 @@ function PaymentEditDialog({
   close: () => void;
 }) {
   const [pending, setPending] = useState<
-    (Values & { periodEnd: string }) | null
+    (Values & { periodEnd: string; storedMonths: string }) | null
   >(null);
   const [olderConfirmed, setOlderConfirmed] = useState(
     daysSince(payment.date) <= PAYMENT_EDIT_REVIEW_DAYS,
   );
   const [saving, setSaving] = useState(false);
   const periodStart = payment.periodStart || payment.date;
+  const initialDuration = durationSelection(
+    periodStart,
+    payment.periodEnd,
+    payment.periodMonths,
+  );
+  const [editPeriodStart, setEditPeriodStart] = useState(periodStart);
+  const [editDuration, setEditDuration] = useState(initialDuration);
+  const [customPeriodEnd, setCustomPeriodEnd] = useState(payment.periodEnd);
+  const [error, setError] = useState("");
   const review = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const values = valuesFrom(event.currentTarget);
+    const periodEnd = endForDuration(
+      values.periodStart,
+      values.months,
+      values.periodEnd,
+    );
+    if (!periodEnd || periodEnd <= values.periodStart) {
+      setError("The covered period must end after it starts.");
+      return;
+    }
+    setError("");
     setPending({
       ...values,
-      periodEnd: addMonths(values.periodStart, values.months),
+      periodEnd,
+      storedMonths: String(
+        monthsForStorage(values.periodStart, values.months, periodEnd),
+      ),
     });
   };
   async function save() {
@@ -828,7 +1206,7 @@ function PaymentEditDialog({
           date: pending.date,
           mode: pending.mode as PaymentMode,
           periodStart: pending.periodStart,
-          periodMonths: Number(pending.months),
+          periodMonths: Number(pending.storedMonths),
           periodEnd: pending.periodEnd,
         });
         if (linked && (anchored || pending.periodEnd >= linked.expiry))
@@ -931,7 +1309,13 @@ function PaymentEditDialog({
             <input
               name="periodStart"
               type="date"
-              defaultValue={periodStart}
+              value={editPeriodStart}
+              onChange={(event) => {
+                const start = event.target.value;
+                setEditPeriodStart(start);
+                if (customPeriodEnd <= start)
+                  setCustomPeriodEnd(addMonths(start, 1));
+              }}
               required
             />
           </label>
@@ -939,15 +1323,35 @@ function PaymentEditDialog({
             Duration
             <select
               name="months"
-              defaultValue={
-                payment.periodMonths ||
-                monthsBetween(periodStart, payment.periodEnd)
-              }
+              value={editDuration}
+              onChange={(event) => {
+                const duration = event.target.value;
+                setEditDuration(duration);
+                if (
+                  duration === CUSTOM_DURATION &&
+                  customPeriodEnd <= editPeriodStart
+                )
+                  setCustomPeriodEnd(addMonths(editPeriodStart, 1));
+              }}
             >
               <DurationOptions />
             </select>
           </label>
         </div>
+        {editDuration === CUSTOM_DURATION && (
+          <label>
+            Period ends
+            <input
+              name="periodEnd"
+              type="date"
+              min={editPeriodStart}
+              value={customPeriodEnd}
+              onChange={(event) => setCustomPeriodEnd(event.target.value)}
+              required
+            />
+          </label>
+        )}
+        {error && <p className="field-error">{error}</p>}
         <div className="modal-actions">
           <Button type="button" variant="secondary" onClick={close}>
             Cancel
@@ -1000,7 +1404,18 @@ function ProfileDialog({
       <ModalHeader
         eyebrow="Member profile"
         title={member.name}
-        text={`${member.phone} · ${member.active ? status.label : "Deactivated"}`}
+        text={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span>
+              {member.phone} · {member.active ? status.label : "Deactivated"}
+            </span>
+            <PhoneLink
+              phone={member.phone}
+              name={member.name}
+              className="!size-7"
+            />
+          </span>
+        }
         onClose={close}
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-1 sm:pb-6">
@@ -1190,9 +1605,24 @@ function EditMemberDialog({
   const [saving, setSaving] = useState(false);
   const shifts = configuredShifts(data.settings);
   const back = () => setModal({ type: "info", id: member.id });
+  const initialPlanStart = member.planStart || member.start;
+  const [planStart, setPlanStart] = useState(initialPlanStart);
+  const [planDuration, setPlanDuration] = useState(
+    durationSelection(initialPlanStart, member.expiry, member.planMonths),
+  );
+  const [customPlanEnd, setCustomPlanEnd] = useState(member.expiry);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = valuesFrom(event.currentTarget);
+    const expiry = endForDuration(
+      values.planStart,
+      values.planMonths,
+      values.periodEnd,
+    );
+    if (!expiry || expiry <= values.planStart) {
+      setError("The membership end date must be after its start date.");
+      return;
+    }
     const duplicate = findMemberByPhone(data.members, values.phone, member.id);
     if (duplicate) {
       setError(
@@ -1231,8 +1661,12 @@ function EditMemberDialog({
           shift: values.shift,
           fee: Number(values.fee),
           planStart: values.planStart,
-          planMonths: Number(values.planMonths),
-          expiry: addMonths(values.planStart, values.planMonths),
+          planMonths: monthsForStorage(
+            values.planStart,
+            values.planMonths,
+            expiry,
+          ),
+          expiry,
         });
       }, "Member details updated");
       if (saved) back();
@@ -1300,7 +1734,13 @@ function EditMemberDialog({
               <input
                 name="planStart"
                 type="date"
-                defaultValue={member.planStart || member.start}
+                value={planStart}
+                onChange={(event) => {
+                  const start = event.target.value;
+                  setPlanStart(start);
+                  if (customPlanEnd <= start)
+                    setCustomPlanEnd(addMonths(start, 1));
+                }}
                 required
               />
             </label>
@@ -1308,15 +1748,34 @@ function EditMemberDialog({
               Duration
               <select
                 name="planMonths"
-                defaultValue={
-                  member.planMonths ||
-                  monthsBetween(member.planStart || member.start, member.expiry)
-                }
+                value={planDuration}
+                onChange={(event) => {
+                  const duration = event.target.value;
+                  setPlanDuration(duration);
+                  if (
+                    duration === CUSTOM_DURATION &&
+                    customPlanEnd <= planStart
+                  )
+                    setCustomPlanEnd(addMonths(planStart, 1));
+                }}
               >
                 <DurationOptions />
               </select>
             </label>
           </div>
+          {planDuration === CUSTOM_DURATION && (
+            <label>
+              Period ends
+              <input
+                name="periodEnd"
+                type="date"
+                min={planStart}
+                value={customPlanEnd}
+                onChange={(event) => setCustomPlanEnd(event.target.value)}
+                required
+              />
+            </label>
+          )}
           {error && <p className="field-error">{error}</p>}
         </div>
         <div className="modal-fixed-actions">

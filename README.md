@@ -11,11 +11,11 @@ StudyDesk is a lightweight management app for Indian self-study libraries, paid 
 - A protected Core admin; additional admins have equal day-to-day application access
 - PostgreSQL storage protected by Row Level Security
 - Morning, Afternoon, Evening, Full Day, and repeatable numbered Hour plans
-- Member admission, overlap-aware seat assignment, editable plan dates, and renewals
+- Member admission, overlap-aware seat assignment, whole-month shortcuts, exact custom end dates, and renewals
 - Unique phone-number identity with guided active-member lookup and inactive-member reactivation
 - Deactivation and reactivation with complete member and payment history preserved
 - Per-member fee history with payment count, totals, and direct corrections
-- Persistent, shift-aware demo seats shared by every admin
+- Persistent, shift-aware demo seats with optional visitor details and admission conversion
 - Configurable advance or later fee collection, including warned admission without payment
 - Monthly, yearly, custom-range, and lifetime fee reporting with CSV export
 - Optional manual attendance, disabled by default
@@ -43,7 +43,7 @@ The frontend is a Vite-powered React 18 application written in TypeScript and st
 - `src/pwa/manifest.ts` — iOS and Android installation metadata
 - `public/` — SD brand mark, app icons, social preview, and Cloudflare response headers
 - `assets/` — editable source artwork that is not shipped to visitors
-- `supabase/migrations/` — database schema, triggers, grants, and access policies
+- `supabase/studydesk.sql` — complete database schema, triggers, grants, and access policies
 - `tests/` — changed-record persistence tests
 - `vite.config.ts` — optimized build and installable-app generation
 
@@ -65,7 +65,7 @@ Run `npm run check` to verify the application and create a production build.
 ## Connect real accounts and cloud data
 
 1. Create a Supabase project.
-2. Run the files in `supabase/migrations/` in number order in its SQL Editor. Existing projects should run every migration they have not applied yet, including `004_demo_seats_and_fee_controls.sql`.
+2. For a new project, run the complete `supabase/studydesk.sql` file once in its SQL Editor. Existing projects that already applied the former numbered migrations do not need to run it again.
 3. Copy `.env.example` to `.env.local` and add the Project URL and publishable key.
 4. Add `http://localhost:3000/**` to the Supabase authentication Redirect URLs.
 5. Before serving real users, configure a custom SMTP provider in **Authentication → Emails → SMTP Settings** so confirmation and password-reset emails can be delivered reliably.

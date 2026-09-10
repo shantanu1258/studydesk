@@ -55,18 +55,18 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group w-full rounded-[1.2rem] border-2 p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:translate-y-0 sm:p-4 ${statTones[tone]}`}
+      className={`group w-full rounded-[1.1rem] border-2 p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:translate-y-0 ${statTones[tone]}`}
     >
       <div className="flex items-center gap-2.5">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm sm:size-9 sm:rounded-xl">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm">
           {icon}
         </span>
         <small className="font-bold leading-tight opacity-80">{label}</small>
       </div>
-      <strong className="mt-2 block font-display text-2xl leading-none text-slate-900 sm:text-3xl">
+      <strong className="mt-1.5 block font-display text-2xl leading-none text-slate-900">
         {value}
       </strong>
-      <em className="mt-1 block text-[11px] leading-tight not-italic opacity-75 sm:text-xs">
+      <em className="mt-1 block text-[11px] leading-tight not-italic opacity-75">
         {note}
       </em>
     </button>

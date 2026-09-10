@@ -69,6 +69,7 @@ export function seedData(
       shifts: structuredClone(DEFAULT_SHIFTS),
       feeCollection: DEFAULT_FEE_COLLECTION,
       attendanceEnabled: DEFAULT_ATTENDANCE_ENABLED,
+      trackDemoVisitors: false,
       primaryColor: DEFAULT_PRIMARY_COLOR,
       secondaryColor: DEFAULT_SECONDARY_COLOR,
       isFounder: true,

@@ -31,6 +31,7 @@ function workspace() {
       shifts: structuredClone(DEFAULT_SHIFTS),
       feeCollection: "advance",
       attendanceEnabled: false,
+      trackDemoVisitors: false,
       primaryColor: DEFAULT_PRIMARY_COLOR,
       secondaryColor: DEFAULT_SECONDARY_COLOR,
       isFounder: true,
@@ -98,6 +99,8 @@ test("demo seat starts and stops are included in database changes", () => {
       library_id: libraryId,
       seat_code: "A-02",
       shift: "Morning",
+      visitor_name: null,
+      visitor_phone: null,
     },
   ]);
 
@@ -177,6 +180,7 @@ test("settings and removed records are represented explicitly", () => {
     shift_definitions: DEFAULT_SHIFTS,
     fee_collection: "advance",
     attendance_enabled: false,
+    track_demo_visitors: false,
     primary_color: DEFAULT_PRIMARY_COLOR,
     secondary_color: DEFAULT_SECONDARY_COLOR,
     seat_sections: [
@@ -200,10 +204,34 @@ test("shift and fee preferences are included when settings change", () => {
     { id: "daily", type: "Daily", name: "Daily", start: "", end: "" },
   ];
   next.settings.feeCollection = "later";
+  next.settings.trackDemoVisitors = true;
 
   const changes = buildWorkspaceChanges(previous, next);
   assert.deepEqual(changes.p_settings.shift_definitions, next.settings.shifts);
   assert.equal(changes.p_settings.fee_collection, "later");
+  assert.equal(changes.p_settings.track_demo_visitors, true);
+});
+
+test("named demo visitors are included in database changes", () => {
+  const previous = workspace();
+  const next = structuredClone(previous);
+  next.demoSeats.push({
+    id: "5851bb39-5f52-47b2-b7dd-68be17f36236",
+    seat: "A-03",
+    shift: "Morning",
+    name: "Aarav Shah",
+    phone: "9999999999",
+  });
+
+  const changes = buildWorkspaceChanges(previous, next);
+  assert.deepEqual(changes.p_demo_seats[0], {
+    id: "5851bb39-5f52-47b2-b7dd-68be17f36236",
+    library_id: libraryId,
+    seat_code: "A-03",
+    shift: "Morning",
+    visitor_name: "Aarav Shah",
+    visitor_phone: "9999999999",
+  });
 });
 
 test("membership plan dates and duration are included when a member changes", () => {

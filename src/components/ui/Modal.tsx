@@ -195,7 +195,7 @@ export function ModalHeader({
 }: {
   eyebrow: string;
   title: string;
-  text?: string;
+  text?: ReactNode;
   onClose: () => void;
   id?: string;
 }) {

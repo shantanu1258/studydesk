@@ -17,6 +17,7 @@
   --status-warning: #f2a900;
   --status-demo: #2563eb;
   --status-demo-border: #1d4ed8;
+  --status-demo-text: #1e40af;
   --status-danger-contrast: #ffffff;
   --status-warning-contrast: #352300;
   --status-warning-text: #805000;
@@ -58,6 +59,7 @@
   --border-subtle: #2a3933;
   --border-input: #3b4c45;
   --status-warning-text: #ffc94d;
+  --status-demo-text: #93c5fd;
   --status-danger-text: color-mix(in srgb, var(--status-danger) 62%, white);
   --status-available-bg: #22302b;
   --status-available-border: #17231f;
@@ -238,6 +240,17 @@
     background: var(--status-demo);
     color: #ffffff;
   }
+  .status-demo-surface {
+    border-color: color-mix(
+      in srgb,
+      var(--status-demo) 28%,
+      var(--surface-panel)
+    );
+    background: color-mix(in srgb, var(--status-demo) 8%, var(--surface-panel));
+  }
+  .status-demo-text {
+    color: var(--status-demo-text);
+  }
   .status-danger-surface {
     border-color: var(--status-danger-border);
     background: var(--status-danger-soft);
@@ -265,6 +278,18 @@
   }
   .icon-button:hover {
     background: var(--surface-soft);
+  }
+  .archive-disclosure > summary {
+    list-style: none;
+  }
+  .archive-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+  .archive-disclosure > summary .archive-chevron {
+    transition: transform 160ms ease;
+  }
+  .archive-disclosure[open] > summary .archive-chevron {
+    transform: rotate(180deg);
   }
 }
 

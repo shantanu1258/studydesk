@@ -162,6 +162,8 @@ export function SettingsPage({
           form.get("feeCollection") === "later" ? "later" : "advance";
         next.settings.attendanceEnabled =
           form.get("attendanceEnabled") === "on";
+        next.settings.trackDemoVisitors =
+          form.get("trackDemoVisitors") === "on";
         next.settings.primaryColor = normalizeColor(
           String(form.get("primaryColor")),
           DEFAULT_PRIMARY_COLOR,
@@ -629,6 +631,21 @@ export function SettingsPage({
               </small>
             </span>
           </label>
+          <label className="flex cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-2xl bg-slate-100 p-4">
+            <input
+              className="!mt-1 !size-4 !min-h-0 !w-4"
+              type="checkbox"
+              name="trackDemoVisitors"
+              defaultChecked={data.settings.trackDemoVisitors}
+            />
+            <span>
+              <strong className="block">Track demo visitors</strong>
+              <small className="font-medium text-slate-600">
+                Ask for a visitor’s name and phone, then show them in the Demo
+                tab until they are admitted or their demo is stopped.
+              </small>
+            </span>
+          </label>
           <Button
             className="sm:justify-self-start"
             type="submit"
@@ -856,7 +873,6 @@ export function SettingsPage({
           <div className="section-title">
             <div>
               <h2>Library team</h2>
-              <p>Only the Core admin can remove another admin</p>
             </div>
             <Button
               disabled={team.busy}

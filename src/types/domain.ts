@@ -52,6 +52,8 @@ export interface SeatDemo {
   id: string;
   seat: string;
   shift: string;
+  name?: string;
+  phone?: string;
 }
 
 export interface LibrarySettings {
@@ -63,6 +65,7 @@ export interface LibrarySettings {
   shifts: Shift[];
   feeCollection: FeeCollectionMode;
   attendanceEnabled: boolean;
+  trackDemoVisitors: boolean;
   primaryColor: string;
   secondaryColor: string;
   isFounder: boolean;
@@ -127,7 +130,7 @@ export interface LibraryInvite {
 }
 
 export type ModalState =
-  | { type: "member"; seat?: string; shift?: string }
+  | { type: "member"; seat?: string; shift?: string; demoId?: string }
   | { type: "member-reactivate"; id: string }
   | { type: "info"; id: string }
   | { type: "member-fees"; id: string }
