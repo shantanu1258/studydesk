@@ -15,6 +15,7 @@ const styles = read("src/styles/index.css");
 const settings = read("src/features/settings/SettingsPage.tsx");
 const members = read("src/features/members/MembersPage.tsx");
 const phoneLink = read("src/components/ui/PhoneLink.tsx");
+const checkboxCard = read("src/components/ui/CheckboxCard.tsx");
 const databaseSetup = read("supabase/studydesk.sql");
 
 test("demo seats have persistent UI and database support", () => {
@@ -100,6 +101,18 @@ test("Supabase has one complete setup file", () => {
   );
   assert.match(databaseSetup, /profile-photos/);
   assert.match(databaseSetup, /track_demo_visitors/);
+  assert.match(
+    databaseSetup,
+    /grant update \(track_demo_visitors\)[\s\S]*?to authenticated/,
+  );
+});
+
+test("settings checkbox cards share one consistent control", () => {
+  assert.match(settings, /<CheckboxCard/);
+  assert.equal(settings.match(/<CheckboxCard/g)?.length, 2);
+  assert.match(checkboxCard, /grid-cols-\[1\.25rem_minmax\(0,1fr\)\]/);
+  assert.match(checkboxCard, /className="peer sr-only"/);
+  assert.match(checkboxCard, /size-5/);
 });
 
 test("fee archive uses collapsed month sections inside year groups", () => {
@@ -111,4 +124,10 @@ test("fee archive uses collapsed month sections inside year groups", () => {
   assert.match(fees, /Collected this month/);
   assert.doesNotMatch(fees, /Active-month average/);
   assert.doesNotMatch(fees, /Selected period/);
+});
+
+test("mobile summary cards retain their compact row layouts", () => {
+  assert.match(fees, /grid max-w-3xl grid-cols-2/);
+  assert.match(dashboard, /min-\[370px\]:grid-cols-2 xl:grid-cols-4/);
+  assert.doesNotMatch(dashboard, /min-\[380px\]:grid-cols-2/);
 });

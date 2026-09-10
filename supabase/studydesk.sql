@@ -1553,6 +1553,9 @@ begin;
 alter table public.libraries
   add column if not exists track_demo_visitors boolean not null default false;
 
+grant update (track_demo_visitors)
+on table public.libraries to authenticated;
+
 alter table public.seat_demos
   add column if not exists visitor_name text,
   add column if not exists visitor_phone text;

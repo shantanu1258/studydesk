@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "../../components/ui/Button";
+import { CheckboxCard } from "../../components/ui/CheckboxCard";
 import { ConfirmDialog } from "../../components/ui/Modal";
 import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
@@ -617,35 +618,18 @@ export function SettingsPage({
               </option>
             </select>
           </label>
-          <label className="flex cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-2xl bg-slate-100 p-4">
-            <input
-              className="!mt-1 !size-4 !min-h-0 !w-4"
-              type="checkbox"
-              name="attendanceEnabled"
-              defaultChecked={data.settings.attendanceEnabled}
-            />
-            <span>
-              <strong className="block">Enable attendance</strong>
-              <small className="font-medium text-slate-600">
-                Optional manual check-ins. Keep off if nobody monitors the desk.
-              </small>
-            </span>
-          </label>
-          <label className="flex cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-2xl bg-slate-100 p-4">
-            <input
-              className="!mt-1 !size-4 !min-h-0 !w-4"
-              type="checkbox"
-              name="trackDemoVisitors"
-              defaultChecked={data.settings.trackDemoVisitors}
-            />
-            <span>
-              <strong className="block">Track demo visitors</strong>
-              <small className="font-medium text-slate-600">
-                Ask for a visitor’s name and phone, then show them in the Demo
-                tab until they are admitted or their demo is stopped.
-              </small>
-            </span>
-          </label>
+          <CheckboxCard
+            name="attendanceEnabled"
+            defaultChecked={data.settings.attendanceEnabled}
+            title="Enable attendance"
+            description="Optional manual check-ins. Keep off if nobody monitors the desk."
+          />
+          <CheckboxCard
+            name="trackDemoVisitors"
+            defaultChecked={data.settings.trackDemoVisitors}
+            title="Track demo visitors"
+            description="Ask for a visitor’s name and phone, then show them in the Demo tab until they are admitted or their demo is stopped."
+          />
           <Button
             className="sm:justify-self-start"
             type="submit"

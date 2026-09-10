@@ -216,7 +216,7 @@ export function FeesPage({
 
   return (
     <section className="grid gap-5">
-      <div className="grid max-w-3xl gap-3 sm:grid-cols-2">
+      <div className="grid max-w-3xl grid-cols-2 gap-2 sm:gap-3">
         {[
           [
             "Collected till date",
@@ -231,15 +231,17 @@ export function FeesPage({
         ].map(([label, value, note], index) => (
           <article
             key={label}
-            className={`rounded-[1.2rem] border-2 p-3.5 sm:p-4 ${["border-indigo-200 bg-indigo-50/70", "border-emerald-200 bg-emerald-50/70"][index]}`}
+            className={`min-w-0 rounded-[1.2rem] border-2 p-3 sm:p-4 ${["border-indigo-200 bg-indigo-50/70", "border-emerald-200 bg-emerald-50/70"][index]}`}
           >
-            <span className="text-xs font-bold text-slate-600 sm:text-sm">
+            <span className="block text-[11px] font-bold leading-tight text-slate-600 min-[370px]:text-xs sm:text-sm">
               {label}
             </span>
-            <strong className="mt-1.5 block font-display text-2xl text-slate-900">
+            <strong className="mt-1.5 block truncate font-display text-xl text-slate-900 min-[370px]:text-2xl">
               {value}
             </strong>
-            <small className="mt-1 block text-slate-600">{note}</small>
+            <small className="mt-1 block text-[10px] leading-tight text-slate-600 min-[370px]:text-xs">
+              {note}
+            </small>
           </article>
         ))}
       </div>
