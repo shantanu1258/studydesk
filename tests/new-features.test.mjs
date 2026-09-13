@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import {
+  dialablePhone,
+  whatsappPhone,
+} from "../src/components/ui/PhoneLink.tsx";
 
 const read = (path) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -42,9 +46,13 @@ test("demo seats have persistent UI and database support", () => {
   assert.match(databaseSetup, /visitor_phone/);
 });
 
-test("member phone numbers can open the device dialler", () => {
+test("member phone numbers can open the dialler and WhatsApp", () => {
   assert.match(phoneLink, /href=\{`tel:/);
-  assert.match(phoneLink, /\+91/);
+  assert.match(phoneLink, /https:\/\/wa\.me/);
+  assert.match(phoneLink, /target="_blank"/);
+  assert.equal(dialablePhone("98765 43210"), "+919876543210");
+  assert.equal(whatsappPhone("98765 43210"), "919876543210");
+  assert.equal(whatsappPhone("+44 7700 900123"), "447700900123");
   assert.match(dialogs, /<PhoneLink/);
   assert.match(members, /<PhoneLink/);
 });
