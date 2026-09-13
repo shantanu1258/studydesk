@@ -60,8 +60,9 @@ test("member phone numbers can open the dialler and WhatsApp", () => {
 test("available seat chips and tiles share a dark-mode-safe surface", () => {
   assert.match(pills, /available: "status-available-surface"/);
   assert.match(seats, /status-available-surface border-dashed/);
-  assert.match(styles, /--status-available-bg: #22302b/);
-  assert.match(styles, /--status-available-border: #17231f/);
+  assert.match(styles, /--status-available-bg: #151f1c/);
+  assert.match(styles, /--status-available-border: #50665d/);
+  assert.match(styles, /--status-available-text: #c2d0c9/);
 });
 
 test("seat sections supply the default admission and first-payment rate", () => {

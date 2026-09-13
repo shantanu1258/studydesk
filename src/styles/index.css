@@ -61,9 +61,9 @@
   --status-warning-text: #ffc94d;
   --status-demo-text: #93c5fd;
   --status-danger-text: color-mix(in srgb, var(--status-danger) 62%, white);
-  --status-available-bg: #22302b;
-  --status-available-border: #17231f;
-  --status-available-text: #e7eeea;
+  --status-available-bg: #151f1c;
+  --status-available-border: #50665d;
+  --status-available-text: #c2d0c9;
 }
 
 @theme {
