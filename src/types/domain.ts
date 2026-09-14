@@ -94,6 +94,7 @@ export interface Payment {
   seat: string;
   amount: number;
   date: string;
+  createdAt?: string;
   mode: PaymentMode;
   periodStart: string;
   periodMonths: number;

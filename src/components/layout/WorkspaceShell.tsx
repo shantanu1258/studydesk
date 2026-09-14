@@ -159,6 +159,12 @@ export function WorkspaceShell({
     navigate(path);
   };
 
+  const openPayment = (paymentId: string) => {
+    controller.setQuery("");
+    controller.setMenuOpen(false);
+    navigate(`${VIEW_PATHS.fees}?payment=${encodeURIComponent(paymentId)}`);
+  };
+
   const closeSearch = () => {
     controller.setQuery("");
     controller.setMenuOpen(false);
@@ -263,6 +269,7 @@ export function WorkspaceShell({
             setShift={controller.setShift}
             setModal={setWorkspaceModal}
             openView={openView}
+            openPayment={openPayment}
           />
         }
       />

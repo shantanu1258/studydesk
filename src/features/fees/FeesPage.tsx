@@ -1,4 +1,11 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ChevronDownIcon } from "../../components/ui/Icons";
@@ -71,6 +78,12 @@ export function FeesPage({
   setModal: Dispatch<SetStateAction<ModalState | null>>;
 }) {
   const today = localDate();
+  const currentYear = today.slice(0, 4);
+  const [searchParams] = useSearchParams();
+  const focusedPaymentId = searchParams.get("payment");
+  const focusedPayment = data.fees.find(
+    (payment) => payment.id === focusedPaymentId,
+  );
   const [period, setPeriod] = useState("this-month");
   const [customFrom, setCustomFrom] = useState(firstOfMonth(today));
   const [customTo, setCustomTo] = useState(today);
@@ -170,15 +183,39 @@ export function FeesPage({
       new Map(),
     ),
   ].sort(([first], [second]) => second.localeCompare(first));
-  const currentYear = today.slice(0, 4);
   const activeFilter =
     period !== "this-month" || Boolean(feeSearch.trim()) || invalidRange;
   const filteredLabel = periodLabel(period, from, to, today);
   const yearStartsOpen = (year: string) =>
     Boolean(feeSearch.trim()) ||
+    focusedPayment?.date.slice(0, 4) === year ||
     period === `year-${year}` ||
     (period !== "all" && yearlyGroups.length === 1) ||
     year === currentYear;
+
+  useEffect(() => {
+    if (!focusedPayment) return;
+    const paymentYear = focusedPayment.date.slice(0, 4);
+    setPeriod(
+      paymentYear === currentYear ? "this-year" : `year-${paymentYear}`,
+    );
+    setFeeSearch("");
+  }, [currentYear, focusedPayment?.date, focusedPayment?.id]);
+
+  const focusedPaymentVisible = Boolean(
+    focusedPaymentId &&
+    payments.some((payment) => payment.id === focusedPaymentId),
+  );
+
+  useEffect(() => {
+    if (!focusedPaymentId || !focusedPaymentVisible) return;
+    const frame = requestAnimationFrame(() => {
+      const paymentRow = document.getElementById(`payment-${focusedPaymentId}`);
+      paymentRow?.scrollIntoView({ behavior: "smooth", block: "center" });
+      paymentRow?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusedPaymentId, focusedPaymentVisible]);
 
   function downloadReport() {
     if (!payments.length || invalidRange) return;
@@ -423,7 +460,10 @@ export function FeesPage({
                         return (
                           <details
                             key={month}
-                            open={Boolean(feeSearch.trim())}
+                            open={
+                              Boolean(feeSearch.trim()) ||
+                              focusedPayment?.date.slice(0, 7) === month
+                            }
                             className="archive-disclosure archive-month ml-2 rounded-xl border border-slate-200 bg-white sm:ml-4"
                           >
                             <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-xl p-3 transition hover:bg-slate-50 sm:px-4">
@@ -456,7 +496,13 @@ export function FeesPage({
                                 );
                                 return (
                                   <div
-                                    className="grid gap-3 bg-white p-3 sm:grid-cols-[1fr_auto] sm:p-4"
+                                    id={`payment-${payment.id}`}
+                                    tabIndex={-1}
+                                    className={`scroll-mt-28 grid gap-3 p-3 outline-none transition sm:grid-cols-[1fr_auto] sm:p-4 ${
+                                      focusedPaymentId === payment.id
+                                        ? "relative z-10 bg-[var(--surface-panel)] ring-2 ring-inset ring-[var(--brand)]"
+                                        : "bg-white"
+                                    }`}
                                     key={payment.id}
                                   >
                                     <div>

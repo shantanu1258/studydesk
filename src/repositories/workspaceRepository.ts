@@ -130,6 +130,7 @@ const rowToPayment = (row: DbRow): Payment => ({
   memberName: row.member_name || "",
   amount: Number(row.amount_inr),
   date: row.paid_on,
+  createdAt: row.created_at || undefined,
   mode: row.payment_mode as PaymentMode,
   periodStart: row.period_start || row.paid_on,
   periodMonths: row.period_months || 1,

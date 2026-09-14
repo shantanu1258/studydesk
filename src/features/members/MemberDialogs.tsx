@@ -136,6 +136,7 @@ function paymentFrom(member: Member, values: Values): Payment {
     seat: member.seat,
     amount: Number(values.amount ?? member.fee * periodMonths),
     date: values.paymentDate ?? values.date,
+    createdAt: new Date().toISOString(),
     mode: (values.paymentMode ?? values.mode) as PaymentMode,
     periodStart,
     periodMonths,

@@ -20,6 +20,7 @@ const settings = read("src/features/settings/SettingsPage.tsx");
 const members = read("src/features/members/MembersPage.tsx");
 const phoneLink = read("src/components/ui/PhoneLink.tsx");
 const checkboxCard = read("src/components/ui/CheckboxCard.tsx");
+const workspaceRepository = read("src/repositories/workspaceRepository.ts");
 const databaseSetup = read("supabase/studydesk.sql");
 
 test("demo seats have persistent UI and database support", () => {
@@ -129,7 +130,7 @@ test("fee archive uses collapsed month sections inside year groups", () => {
   assert.match(fees, /archive-year/);
   assert.match(fees, /archive-month/);
   assert.match(fees, /open=\{yearStartsOpen/);
-  assert.match(fees, /open=\{Boolean\(feeSearch\.trim\(\)\)\}/);
+  assert.match(fees, /Boolean\(feeSearch\.trim\(\)\) \|\|/);
   assert.match(fees, /Collected this month/);
   assert.doesNotMatch(fees, /Active-month average/);
   assert.doesNotMatch(fees, /Selected period/);
@@ -139,4 +140,19 @@ test("mobile summary cards retain their compact row layouts", () => {
   assert.match(fees, /grid max-w-3xl grid-cols-2/);
   assert.match(dashboard, /min-\[370px\]:grid-cols-2 xl:grid-cols-4/);
   assert.doesNotMatch(dashboard, /min-\[380px\]:grid-cols-2/);
+});
+
+test("recent activity is time-sorted and fee entries deep-link to payments", () => {
+  assert.match(dashboard, /new Date\(second\.sortAt\)\.getTime\(\)/);
+  assert.match(dashboard, /fee\.createdAt \|\|/);
+  assert.match(dashboard, /openPayment\(activity\.paymentId\)/);
+  assert.match(dashboard, /View payment →/);
+  assert.match(
+    workspaceRepository,
+    /createdAt: row\.created_at \|\| undefined/,
+  );
+  assert.match(fees, /useSearchParams/);
+  assert.match(fees, /scrollIntoView\(\{ behavior: "smooth"/);
+  assert.match(fees, /id=\{`payment-\$\{payment\.id\}`\}/);
+  assert.match(fees, /ring-\[var\(--brand\)\]/);
 });

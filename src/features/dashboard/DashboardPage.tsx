@@ -75,8 +75,33 @@ function StatCard({
 
 type DashboardModal = "seats" | "dues" | null;
 
+type DashboardActivity = {
+  id: string;
+  title: string;
+  detail: string;
+  kind: "attendance" | "fee";
+  sortAt: string;
+  when: string;
+  paymentId?: string;
+};
+
 const percentOf = (count: number, total: number) =>
   total ? Math.round((count / total) * 1000) / 10 : 0;
+
+const activityTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return prettyDate(timestamp.slice(0, 10));
+  const day = localDate(date);
+  const time = new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  if (day === localDate()) return `Today · ${time}`;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (day === localDate(yesterday)) return `Yesterday · ${time}`;
+  return `${prettyDate(day)} · ${time}`;
+};
 
 export function DashboardPage({
   data,
@@ -84,12 +109,14 @@ export function DashboardPage({
   setShift,
   setModal,
   openView,
+  openPayment,
 }: {
   data: WorkspaceData;
   shift: string;
   setShift: Dispatch<SetStateAction<string>>;
   setModal: Dispatch<SetStateAction<ModalState | null>>;
   openView: (view: ViewId) => void;
+  openPayment: (paymentId: string) => void;
 }) {
   const [dashboardModal, setDashboardModal] = useState<DashboardModal>(null);
   const [dueSearch, setDueSearch] = useState("");
@@ -172,23 +199,53 @@ export function DashboardPage({
       percent: percentOf(count, data.settings.seatCount),
     };
   });
-  const activities = [
-    ...data.attendance
-      .filter((item) => item.date === localDate())
-      .map((item) => ({
-        title: `${data.members.find((member) => member.id === item.memberId)?.name || "Member"} checked ${item.out ? "out" : "in"}`,
-        detail: item.out ? `${item.in}–${item.out}` : `At ${item.in}`,
+  const attendanceActivities: DashboardActivity[] = [];
+  data.attendance.forEach((item) => {
+    const memberName =
+      data.members.find((member) => member.id === item.memberId)?.name ||
+      "Member";
+    if (item.in) {
+      const sortAt = `${item.date}T${item.in}:00`;
+      attendanceActivities.push({
+        id: `attendance-${item.id}-in`,
+        title: `${memberName} checked in`,
+        detail: `At ${item.in}`,
         kind: "attendance",
-      })),
-    ...[...data.fees]
-      .reverse()
-      .slice(0, 3)
-      .map((fee) => ({
-        title: `Fee received from ${fee.memberName || "Member"}`,
-        detail: `${money(fee.amount)} · ${fee.seat || "Seat not recorded"} · ${fee.mode}`,
-        kind: "fee",
-      })),
-  ].slice(0, 4);
+        sortAt,
+        when: activityTime(sortAt),
+      });
+    }
+    if (item.out) {
+      const sortAt = `${item.date}T${item.out}:00`;
+      attendanceActivities.push({
+        id: `attendance-${item.id}-out`,
+        title: `${memberName} checked out`,
+        detail: `${item.in}–${item.out}`,
+        kind: "attendance",
+        sortAt,
+        when: activityTime(sortAt),
+      });
+    }
+  });
+  const paymentActivities: DashboardActivity[] = data.fees.map((fee) => {
+    const sortAt = fee.createdAt || `${fee.date}T12:00:00`;
+    return {
+      id: `fee-${fee.id}`,
+      title: `Fee received from ${fee.memberName || "Member"}`,
+      detail: `${money(fee.amount)} · ${fee.seat || "Seat not recorded"} · ${fee.mode}`,
+      kind: "fee",
+      sortAt,
+      when: fee.createdAt ? activityTime(fee.createdAt) : prettyDate(fee.date),
+      paymentId: fee.id,
+    };
+  });
+  const activities = [...attendanceActivities, ...paymentActivities]
+    .sort(
+      (first, second) =>
+        new Date(second.sortAt).getTime() - new Date(first.sortAt).getTime() ||
+        second.id.localeCompare(first.id),
+    )
+    .slice(0, 4);
   return (
     <>
       <section className="grid gap-3 min-[370px]:grid-cols-2 xl:grid-cols-4">
@@ -232,7 +289,7 @@ export function DashboardPage({
         <SectionJumpNav
           items={[
             { id: "overview-seats", label: "Seat availability" },
-            { id: "overview-activity", label: "Today’s activity" },
+            { id: "overview-activity", label: "Recent activity" },
           ]}
         />
       </div>
@@ -270,16 +327,21 @@ export function DashboardPage({
         >
           <div className="section-title">
             <div>
-              <h2>Today’s activity</h2>
+              <h2>Recent activity</h2>
               <p>Latest desk updates</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3">
             {activities.length ? (
-              activities.map((activity, index) => (
-                <div
-                  key={`${activity.title}-${index}`}
-                  className="flex gap-3 rounded-2xl bg-slate-50 p-3.5"
+              activities.map((activity) => (
+                <button
+                  key={activity.id}
+                  type="button"
+                  disabled={!activity.paymentId}
+                  onClick={() =>
+                    activity.paymentId && openPayment(activity.paymentId)
+                  }
+                  className="flex w-full gap-3 rounded-2xl bg-slate-50 p-3.5 text-left transition enabled:hover:bg-slate-100 enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[var(--brand)] disabled:cursor-default"
                 >
                   <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-700 shadow-sm">
                     {activity.kind === "fee" ? (
@@ -288,7 +350,7 @@ export function DashboardPage({
                       <CalendarIcon className="size-5" />
                     )}
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <strong className="text-sm text-slate-900">
                       {activity.title}
                     </strong>
@@ -296,10 +358,15 @@ export function DashboardPage({
                       {activity.detail}
                     </p>
                     <small className="text-[11px] font-semibold text-slate-400">
-                      Today
+                      {activity.when}
                     </small>
+                    {activity.paymentId && (
+                      <small className="ml-2 text-[11px] font-extrabold text-[var(--brand)]">
+                        View payment →
+                      </small>
+                    )}
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <EmptyState
