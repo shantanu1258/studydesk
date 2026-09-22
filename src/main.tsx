@@ -5,6 +5,8 @@ import { App } from "./app/App";
 import { ModalHistoryProvider } from "./components/ui/Modal";
 import { ThemeProvider } from "./context/ThemeContext";
 import { registerPwa } from "./infrastructure/pwa/registerPwa";
+import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/dm-sans/wght-italic.css";
 import "./styles/index.css";
 
 createRoot(document.getElementById("app")!).render(

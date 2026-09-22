@@ -4,7 +4,7 @@ interface Props {
   name: string;
   defaultChecked?: boolean;
   title: ReactNode;
-  description: ReactNode;
+  description?: ReactNode;
 }
 
 export function CheckboxCard({
@@ -39,7 +39,9 @@ export function CheckboxCard({
       </span>
       <span className="min-w-0">
         <strong className="block">{title}</strong>
-        <small className="font-medium text-slate-600">{description}</small>
+        {description && (
+          <small className="font-medium text-slate-600">{description}</small>
+        )}
       </span>
     </label>
   );

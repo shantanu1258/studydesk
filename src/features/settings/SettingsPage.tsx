@@ -543,10 +543,7 @@ export function SettingsPage({
         onSubmit={saveGeneral}
       >
         <div className="section-title">
-          <div>
-            <h2>Library setup</h2>
-            <p>Used throughout your workspace</p>
-          </div>
+          <h2>Library setup</h2>
         </div>
         <div className="mt-5 form-stack">
           <label>
@@ -622,13 +619,11 @@ export function SettingsPage({
             name="attendanceEnabled"
             defaultChecked={data.settings.attendanceEnabled}
             title="Enable attendance"
-            description="Optional manual check-ins. Keep off if nobody monitors the desk."
           />
           <CheckboxCard
             name="trackDemoVisitors"
             defaultChecked={data.settings.trackDemoVisitors}
             title="Track demo visitors"
-            description="Ask for a visitor’s name and phone, then show them in the Demo tab until they are admitted or their demo is stopped."
           />
           <Button
             className="sm:justify-self-start"
@@ -733,10 +728,6 @@ export function SettingsPage({
             </div>
           ))}
         </div>
-        <p className="helper mt-4">
-          Example: A-01–A-20 at ₹800 and B-21–B-40 at ₹1,200. The matching rate
-          is suggested during admission.
-        </p>
         <p className="field-error mt-2">{seatError}</p>
         <Button
           className="mt-2 w-full sm:w-auto"
@@ -749,10 +740,7 @@ export function SettingsPage({
       </article>
       <article id="settings-shifts" className="panel scroll-mt-24 p-5 sm:p-6">
         <div className="section-title">
-          <div>
-            <h2>Shifts & timings</h2>
-            <p>Add timed plans, or keep one simple Daily plan</p>
-          </div>
+          <h2>Shifts & timings</h2>
           <Button
             variant="secondary"
             disabled={Boolean(busy)}
@@ -831,10 +819,6 @@ export function SettingsPage({
             </div>
           ))}
         </div>
-        <p className="helper mt-4">
-          Hour plans may be added more than once and are numbered automatically.
-          Overlapping plans share seat availability.
-        </p>
         <p className="field-error mt-2">{shiftError}</p>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:justify-between">
           <Button variant="secondary" onClick={addShift}>
@@ -923,10 +907,6 @@ export function SettingsPage({
             <p className="helper mt-4">Loading library users…</p>
           )}
           {team.error && <p className="field-error mt-4">{team.error}</p>}
-          <p className="helper mt-4">
-            Share the code privately. It works once; a new code cancels the
-            previous unused one.
-          </p>
         </article>
       )}
       {removeTarget && (

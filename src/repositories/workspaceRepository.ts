@@ -14,6 +14,8 @@ import type {
   AppUser,
   AttendanceRecord,
   LibrarySettings,
+  MaintenanceCategory,
+  MaintenanceExpense,
   Member,
   Payment,
   PaymentMode,
@@ -89,6 +91,18 @@ const paymentToRow = (
     addMonths(payment.periodStart || payment.date, payment.periodMonths || 1),
 });
 
+const maintenanceExpenseToRow = (
+  expense: MaintenanceExpense,
+  libraryId: string,
+) => ({
+  id: expense.id,
+  library_id: libraryId,
+  category: expense.category,
+  amount_inr: Number(expense.amount),
+  paid_on: expense.date,
+  note: expense.note.trim() || null,
+});
+
 const attendanceToRow = (record: AttendanceRecord, libraryId: string) => ({
   id: record.id,
   library_id: libraryId,
@@ -139,6 +153,15 @@ const rowToPayment = (row: DbRow): Payment => ({
     addMonths(row.period_start || row.paid_on, row.period_months || 1),
 });
 
+const rowToMaintenanceExpense = (row: DbRow): MaintenanceExpense => ({
+  id: row.id,
+  category: row.category as MaintenanceCategory,
+  amount: Number(row.amount_inr),
+  date: row.paid_on,
+  note: row.note || "",
+  createdAt: row.created_at || undefined,
+});
+
 const rowToAttendance = (row: DbRow): AttendanceRecord => ({
   id: row.id,
   memberId: row.member_id,
@@ -187,6 +210,9 @@ export function normalizeWorkspace(workspace: WorkspaceData): WorkspaceData {
     ...workspace,
     members,
     fees,
+    maintenance: Array.isArray(workspace.maintenance)
+      ? workspace.maintenance
+      : [],
     demoSeats: Array.isArray(workspace.demoSeats) ? workspace.demoSeats : [],
     settings: {
       ...workspace.settings,
@@ -283,6 +309,10 @@ export function buildWorkspaceChanges(
     p_payments: changedRows(previous.fees, next.fees).map((row) =>
       paymentToRow(row, libraryId, next.members),
     ),
+    p_maintenance_expenses: changedRows(
+      previous.maintenance || [],
+      next.maintenance || [],
+    ).map((row) => maintenanceExpenseToRow(row, libraryId)),
     p_attendance: changedRows(previous.attendance, next.attendance).map((row) =>
       attendanceToRow(row, libraryId),
     ),
@@ -292,6 +322,10 @@ export function buildWorkspaceChanges(
     ).map((row) => demoSeatToRow(row, libraryId)),
     p_deleted_member_ids: removedIds(previous.members, next.members),
     p_deleted_payment_ids: removedIds(previous.fees, next.fees),
+    p_deleted_maintenance_expense_ids: removedIds(
+      previous.maintenance || [],
+      next.maintenance || [],
+    ),
     p_deleted_attendance_ids: removedIds(previous.attendance, next.attendance),
     p_deleted_demo_seat_ids: removedIds(
       previous.demoSeats || [],
@@ -324,32 +358,46 @@ export const workspaceRepository = {
       );
     }
 
-    const [membersResult, paymentsResult, attendanceResult, demoSeatsResult] =
-      await Promise.all([
-        client
-          .from("members")
-          .select("*")
-          .eq("library_id", library.id)
-          .order("name"),
-        client
-          .from("payments")
-          .select("*")
-          .eq("library_id", library.id)
-          .order("paid_on"),
-        client
-          .from("attendance")
-          .select("*")
-          .eq("library_id", library.id)
-          .order("attendance_date"),
-        client
-          .from("seat_demos")
-          .select("*")
-          .eq("library_id", library.id)
-          .order("seat_code"),
-      ]);
-    [membersResult, paymentsResult, attendanceResult, demoSeatsResult].forEach(
-      assertResult,
-    );
+    const [
+      membersResult,
+      paymentsResult,
+      maintenanceResult,
+      attendanceResult,
+      demoSeatsResult,
+    ] = await Promise.all([
+      client
+        .from("members")
+        .select("*")
+        .eq("library_id", library.id)
+        .order("name"),
+      client
+        .from("payments")
+        .select("*")
+        .eq("library_id", library.id)
+        .order("paid_on"),
+      client
+        .from("maintenance_expenses")
+        .select("*")
+        .eq("library_id", library.id)
+        .order("paid_on"),
+      client
+        .from("attendance")
+        .select("*")
+        .eq("library_id", library.id)
+        .order("attendance_date"),
+      client
+        .from("seat_demos")
+        .select("*")
+        .eq("library_id", library.id)
+        .order("seat_code"),
+    ]);
+    [
+      membersResult,
+      paymentsResult,
+      maintenanceResult,
+      attendanceResult,
+      demoSeatsResult,
+    ].forEach(assertResult);
 
     return normalizeWorkspace({
       settings: {
@@ -368,6 +416,7 @@ export const workspaceRepository = {
       },
       members: (membersResult.data || []).map(rowToMember),
       fees: (paymentsResult.data || []).map(rowToPayment),
+      maintenance: (maintenanceResult.data || []).map(rowToMaintenanceExpense),
       attendance: (attendanceResult.data || []).map(rowToAttendance),
       demoSeats: (demoSeatsResult.data || []).map(rowToDemoSeat),
     });

@@ -143,12 +143,14 @@ export function PageHeader({
               </span>
             )}
           </div>
-          <h1 className="mt-1 font-display text-2xl font-bold leading-[1.05] tracking-[-.02em] text-slate-900">
+          <h1 className="mt-1 font-display text-[1.35rem] font-bold leading-[1.08] tracking-[-.02em] text-slate-900">
             {title}
           </h1>
-          <p className="mt-1.5 max-w-2xl text-[13px] leading-snug opacity-75">
-            {subtitle}
-          </p>
+          {subtitle && (
+            <p className="mt-1.5 max-w-2xl text-xs leading-snug opacity-75">
+              {subtitle}
+            </p>
+          )}
         </div>
 
         <div className="mx-auto hidden max-w-[1500px] items-start gap-4 sm:flex">
@@ -167,9 +169,11 @@ export function PageHeader({
             <h1 className="mt-2 font-display text-4xl font-bold leading-[1.05] tracking-[-.02em] text-slate-900">
               {title}
             </h1>
-            <p className="mt-2 max-w-2xl text-base text-slate-600">
-              {subtitle}
-            </p>
+            {subtitle && (
+              <p className="mt-2 max-w-2xl text-base text-slate-600">
+                {subtitle}
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle className="text-slate-700 hover:bg-slate-200/70" />

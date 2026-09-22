@@ -441,6 +441,165 @@ using ((select private.user_owns_library(library_id)));
 commit;
 
 -- =============================================================================
+-- 1a. Maintenance expenses and net earnings
+-- =============================================================================
+
+begin;
+
+create table if not exists public.maintenance_expenses (
+  id uuid primary key,
+  library_id uuid not null references public.libraries(id) on delete cascade,
+  category text not null check (
+    category in (
+      'Electricity',
+      'Cleaning',
+      'Rent',
+      'Repairs',
+      'Internet',
+      'Supplies',
+      'Staff',
+      'Other'
+    )
+  ),
+  amount_inr integer not null check (amount_inr > 0),
+  paid_on date not null default current_date,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (note is null or char_length(note) <= 240)
+);
+
+create index if not exists maintenance_expenses_library_id_idx
+  on public.maintenance_expenses(library_id);
+create index if not exists maintenance_expenses_paid_on_idx
+  on public.maintenance_expenses(library_id, paid_on desc);
+
+drop trigger if exists maintenance_expenses_set_updated_at
+  on public.maintenance_expenses;
+create trigger maintenance_expenses_set_updated_at
+before update on public.maintenance_expenses
+for each row execute function private.set_updated_at();
+
+alter table public.maintenance_expenses enable row level security;
+
+revoke all on table public.maintenance_expenses from anon, authenticated;
+grant select, insert, update, delete
+on table public.maintenance_expenses to authenticated;
+
+drop policy if exists "library users read maintenance expenses"
+  on public.maintenance_expenses;
+create policy "library users read maintenance expenses"
+on public.maintenance_expenses for select to authenticated
+using ((select private.user_owns_library(library_id)));
+
+drop policy if exists "library users add maintenance expenses"
+  on public.maintenance_expenses;
+create policy "library users add maintenance expenses"
+on public.maintenance_expenses for insert to authenticated
+with check ((select private.user_owns_library(library_id)));
+
+drop policy if exists "library users update maintenance expenses"
+  on public.maintenance_expenses;
+create policy "library users update maintenance expenses"
+on public.maintenance_expenses for update to authenticated
+using ((select private.user_owns_library(library_id)))
+with check ((select private.user_owns_library(library_id)));
+
+drop policy if exists "library users remove maintenance expenses"
+  on public.maintenance_expenses;
+create policy "library users remove maintenance expenses"
+on public.maintenance_expenses for delete to authenticated
+using ((select private.user_owns_library(library_id)));
+
+create or replace function public.apply_workspace_changes(
+  p_library_id uuid,
+  p_settings jsonb,
+  p_members jsonb,
+  p_payments jsonb,
+  p_maintenance_expenses jsonb,
+  p_attendance jsonb,
+  p_demo_seats jsonb,
+  p_deleted_member_ids uuid[],
+  p_deleted_payment_ids uuid[],
+  p_deleted_maintenance_expense_ids uuid[],
+  p_deleted_attendance_ids uuid[],
+  p_deleted_demo_seat_ids uuid[]
+)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  perform public.apply_workspace_changes(
+    p_library_id,
+    p_settings,
+    p_members,
+    p_payments,
+    p_attendance,
+    p_demo_seats,
+    p_deleted_member_ids,
+    p_deleted_payment_ids,
+    p_deleted_attendance_ids,
+    p_deleted_demo_seat_ids
+  );
+
+  insert into public.maintenance_expenses as expense (
+    id,
+    library_id,
+    category,
+    amount_inr,
+    paid_on,
+    note
+  )
+  select
+    item.id,
+    p_library_id,
+    item.category,
+    item.amount_inr,
+    item.paid_on,
+    nullif(btrim(item.note), '')
+  from jsonb_to_recordset(
+    coalesce(p_maintenance_expenses, '[]'::jsonb)
+  ) as item(
+    id uuid,
+    library_id uuid,
+    category text,
+    amount_inr integer,
+    paid_on date,
+    note text
+  )
+  on conflict (id) do update
+  set
+    category = excluded.category,
+    amount_inr = excluded.amount_inr,
+    paid_on = excluded.paid_on,
+    note = excluded.note
+  where expense.library_id = p_library_id;
+
+  delete from public.maintenance_expenses
+  where library_id = p_library_id
+    and id = any(
+      coalesce(p_deleted_maintenance_expense_ids, array[]::uuid[])
+    );
+end;
+$$;
+
+revoke execute on function public.apply_workspace_changes(
+  uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb,
+  uuid[], uuid[], uuid[], uuid[], uuid[]
+) from public;
+
+grant execute on function public.apply_workspace_changes(
+  uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb,
+  uuid[], uuid[], uuid[], uuid[], uuid[]
+) to authenticated;
+
+notify pgrst, 'reload schema';
+
+commit;
+
+-- =============================================================================
 -- 2. Library preferences, shared administrators, and invitations
 -- =============================================================================
 

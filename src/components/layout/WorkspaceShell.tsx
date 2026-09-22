@@ -36,6 +36,10 @@ import { AccountDialog } from "../../features/account/AccountDialog";
 import { AttendancePage } from "../../features/attendance/AttendancePage";
 import { DashboardPage } from "../../features/dashboard/DashboardPage";
 import { FeesPage } from "../../features/fees/FeesPage";
+import {
+  isMaintenanceModal,
+  MaintenanceDialogRouter,
+} from "../../features/fees/MaintenanceDialogs";
 import { MemberDialogRouter } from "../../features/members/MemberDialogs";
 import { MembersPage } from "../../features/members/MembersPage";
 import { SearchPage } from "../../features/search/SearchPage";
@@ -50,14 +54,11 @@ import { initials } from "../../utils/format";
 import { libraryTheme } from "../../utils/theme";
 
 const PAGE_COPY: Record<Exclude<ViewId, "overview">, [string, string]> = {
-  members: ["Members", "Admissions, plans and renewals in one list."],
-  fees: ["Fees", "Track monthly collections and revisit any past month."],
-  search: ["Search", "Find any member by name, phone, seat or shift."],
-  attendance: [
-    "Attendance",
-    "A simple daily record for a monitored front desk.",
-  ],
-  settings: ["Settings", "Shape StudyDesk around your library."],
+  members: ["Members", ""],
+  fees: ["Earnings", ""],
+  search: ["Search", ""],
+  attendance: ["Attendance", ""],
+  settings: ["Settings", ""],
 };
 
 const icons = {
@@ -231,10 +232,7 @@ export function WorkspaceShell({
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const [title, subtitle] =
     currentView === "overview"
-      ? [
-          `${greeting}, ${firstName}.`,
-          "Here’s how your study hall is doing today.",
-        ]
+      ? [`${greeting}, ${firstName}.`, ""]
       : PAGE_COPY[currentView];
   const dateLabel = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
@@ -350,14 +348,10 @@ export function WorkspaceShell({
           </span>
           <div>
             <strong className="block text-lg">StudyDesk</strong>
-            <small className="text-white/70">Reading room manager</small>
           </div>
         </NavLink>
         <div className="mx-4 mt-5 rounded-2xl border border-white/15 bg-white/10 p-4">
-          <small className="text-[10px] font-extrabold tracking-[.18em] text-white/65">
-            YOUR WORKSPACE
-          </small>
-          <strong className="mt-1 block font-display text-xl leading-tight text-white">
+          <strong className="block font-display text-xl leading-tight text-white">
             {data.settings.library}
           </strong>
         </div>
@@ -488,15 +482,23 @@ export function WorkspaceShell({
       >
         <ArrowUpIcon className="size-5" />
       </button>
-      {workspaceModal && (
-        <MemberDialogRouter
-          modal={workspaceModal}
-          data={data}
-          shift={controller.shift}
-          commit={controller.commit}
-          setModal={setWorkspaceModal}
-        />
-      )}
+      {workspaceModal &&
+        (isMaintenanceModal(workspaceModal) ? (
+          <MaintenanceDialogRouter
+            modal={workspaceModal}
+            data={data}
+            commit={controller.commit}
+            setModal={setWorkspaceModal}
+          />
+        ) : (
+          <MemberDialogRouter
+            modal={workspaceModal}
+            data={data}
+            shift={controller.shift}
+            commit={controller.commit}
+            setModal={setWorkspaceModal}
+          />
+        ))}
       {accountOpen && (
         <AccountDialog
           user={user}

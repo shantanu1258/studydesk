@@ -110,6 +110,9 @@ export function DataBackupCard({
       };
       next.members = restored.members;
       next.fees = restored.fees;
+      next.maintenance = Array.isArray(restored.maintenance)
+        ? restored.maintenance
+        : [];
       next.attendance = restored.attendance;
       next.demoSeats = Array.isArray(restored.demoSeats)
         ? restored.demoSeats
@@ -123,14 +126,7 @@ export function DataBackupCard({
   return (
     <article className="panel p-5 sm:p-6">
       <div className="section-title">
-        <div>
-          <h2>Data & backup</h2>
-          <p>
-            {storageMode === "cloud"
-              ? "Your live workspace is stored in Supabase."
-              : "Demo records stay in this browser."}
-          </p>
-        </div>
+        <h2>Data & backup</h2>
         <StatusPill tone={storageMode === "cloud" ? "active" : "due"}>
           {storageMode === "cloud" ? "Cloud saved" : "This device"}
         </StatusPill>
@@ -142,9 +138,6 @@ export function DataBackupCard({
           </span>
           <span>
             <strong className="block">Download backup</strong>
-            <small className="text-slate-600">
-              Save a private copy of all library records.
-            </small>
           </span>
         </button>
         <label className={actionClass}>
@@ -153,9 +146,6 @@ export function DataBackupCard({
           </span>
           <span>
             <strong className="block">Restore a backup</strong>
-            <small className="text-slate-600">
-              Replace this workspace from a StudyDesk file.
-            </small>
           </span>
           <input
             className="sr-only"
@@ -165,14 +155,11 @@ export function DataBackupCard({
           />
         </label>
       </div>
-      <p className="helper mt-4">
-        Backups contain member and payment information. Store them carefully.
-      </p>
       {error && <p className="field-error mt-2">{error}</p>}
       {pending && (
         <ConfirmDialog
           title="Restore this backup?"
-          text={`${pending.fileName} contains ${pending.restored.members.length} members and ${pending.restored.fees.length} payments. It will replace the current workspace data.`}
+          text={`${pending.fileName} contains ${pending.restored.members.length} members, ${pending.restored.fees.length} payments, and ${pending.restored.maintenance?.length || 0} maintenance entries. It will replace the current workspace data.`}
           confirmLabel="Restore backup"
           onCancel={() => setPending(null)}
           onConfirm={restore}

@@ -11,6 +11,8 @@ const read = (path) =>
 
 const dialogs = read("src/features/members/MemberDialogs.tsx");
 const fees = read("src/features/fees/FeesPage.tsx");
+const maintenanceArchive = read("src/features/fees/MaintenanceArchive.tsx");
+const maintenanceDialogs = read("src/features/fees/MaintenanceDialogs.tsx");
 const seats = read("src/components/workspace/SeatGrid.tsx");
 const pills = read("src/components/ui/StatusPill.tsx");
 const progress = read("src/components/ui/ProgressIndicator.tsx");
@@ -136,8 +138,33 @@ test("fee archive uses collapsed month sections inside year groups", () => {
   assert.doesNotMatch(fees, /Selected period/);
 });
 
+test("earnings include shared maintenance expenses and net income", () => {
+  assert.match(fees, /Net earnings/);
+  assert.match(fees, /scrollToSection/);
+  assert.match(fees, /<MaintenanceArchive/);
+  assert.match(maintenanceArchive, /id="earnings-maintenance"/);
+  assert.match(maintenanceArchive, /Add maintenance/);
+  assert.match(maintenanceArchive, /maintenance-edit/);
+  assert.match(maintenanceArchive, /maintenance-delete/);
+  assert.match(maintenanceArchive, /initiallyOpen=\{month === currentMonth\}/);
+  assert.match(maintenanceArchive, /archive-year/);
+  assert.match(maintenanceArchive, /archive-month/);
+  assert.match(maintenanceDialogs, /MAINTENANCE_CATEGORIES/);
+  assert.match(maintenanceDialogs, /Add maintenance expense/);
+  assert.match(dashboard, /Fees this month/);
+  assert.match(dashboard, /title=\{monthLabel\(month\)\}/);
+  assert.match(dashboard, /Go to earnings/);
+  assert.match(dashboard, /openEarningsSection/);
+  assert.match(
+    databaseSetup,
+    /create table if not exists public\.maintenance_expenses/,
+  );
+  assert.match(databaseSetup, /p_maintenance_expenses jsonb/);
+  assert.match(databaseSetup, /p_deleted_maintenance_expense_ids uuid\[\]/);
+});
+
 test("mobile summary cards retain their compact row layouts", () => {
-  assert.match(fees, /grid max-w-3xl grid-cols-2/);
+  assert.match(fees, /grid max-w-4xl grid-cols-3/);
   assert.match(dashboard, /min-\[370px\]:grid-cols-2 xl:grid-cols-4/);
   assert.doesNotMatch(dashboard, /min-\[380px\]:grid-cols-2/);
 });

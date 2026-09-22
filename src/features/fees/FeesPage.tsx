@@ -10,11 +10,11 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ChevronDownIcon } from "../../components/ui/Icons";
 import { SearchField } from "../../components/ui/SearchField";
-import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { DueMemberCard } from "../../components/workspace/DueMemberCard";
 import { PAYMENT_EDIT_REVIEW_DAYS } from "../../config/constants";
 import type { ModalState, Payment, WorkspaceData } from "../../types/domain";
+import { earningsForMonth } from "../../utils/earnings";
 import {
   daysSince,
   localDate,
@@ -24,6 +24,7 @@ import {
 } from "../../utils/format";
 import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
+import { MaintenanceArchive } from "./MaintenanceArchive";
 
 const firstOfMonth = (date: string) => `${date.slice(0, 7)}-01`;
 const moveMonth = (date: string, amount: number) => {
@@ -78,6 +79,7 @@ export function FeesPage({
   setModal: Dispatch<SetStateAction<ModalState | null>>;
 }) {
   const today = localDate();
+  const currentMonth = today.slice(0, 7);
   const currentYear = today.slice(0, 4);
   const [searchParams] = useSearchParams();
   const focusedPaymentId = searchParams.get("payment");
@@ -150,20 +152,14 @@ export function FeesPage({
         .sort((a, b) => b.date.localeCompare(a.date)),
     [data.fees, data.members, feeSearch, from, to, invalidRange],
   );
-  const total = data.fees.reduce(
-    (sum, payment) => sum + Number(payment.amount),
-    0,
-  );
   const filteredTotal = payments.reduce(
     (sum, payment) => sum + Number(payment.amount),
     0,
   );
-  const thisMonthPayments = data.fees.filter((payment) =>
-    payment.date.startsWith(today.slice(0, 7)),
-  );
-  const thisMonthTotal = thisMonthPayments.reduce(
-    (sum, payment) => sum + Number(payment.amount),
-    0,
+  const thisMonthEarnings = earningsForMonth(
+    data.fees,
+    data.maintenance,
+    currentMonth,
   );
   const groups = payments.reduce<Map<string, Payment[]>>((map, payment) => {
     const month = payment.date.slice(0, 7);
@@ -251,43 +247,55 @@ export function FeesPage({
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  const scrollToSection = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
   return (
     <section className="grid gap-5">
-      <div className="grid max-w-3xl grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid max-w-4xl grid-cols-3 gap-2 sm:gap-3">
         {[
           [
-            "Collected till date",
-            money(total),
-            `${data.fees.length} lifetime payments`,
+            "Collected this month",
+            money(thisMonthEarnings.feeIncome),
+            "fees-archive",
           ],
           [
-            "Collected this month",
-            money(thisMonthTotal),
-            `${thisMonthPayments.length} ${thisMonthPayments.length === 1 ? "payment" : "payments"}`,
+            "Maintenance",
+            money(thisMonthEarnings.maintenancePaid),
+            "earnings-maintenance",
           ],
-        ].map(([label, value, note], index) => (
-          <article
+          [
+            "Net earnings",
+            money(thisMonthEarnings.netEarnings),
+            "earnings-maintenance",
+          ],
+        ].map(([label, value, target], index) => (
+          <button
+            type="button"
             key={label}
-            className={`min-w-0 rounded-[1.2rem] border-2 p-3 sm:p-4 ${["border-indigo-200 bg-indigo-50/70", "border-emerald-200 bg-emerald-50/70"][index]}`}
+            onClick={() => scrollToSection(target)}
+            className={`min-w-0 rounded-[1.2rem] border-2 p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] sm:p-4 ${
+              [
+                "border-emerald-200 bg-emerald-50/70",
+                "status-warning-surface",
+                thisMonthEarnings.netEarnings < 0
+                  ? "status-danger-surface"
+                  : "border-sky-300 bg-sky-50/70",
+              ][index]
+            }`}
           >
-            <span className="block text-[11px] font-bold leading-tight text-slate-600 min-[370px]:text-xs sm:text-sm">
+            <span className="block text-[10px] font-bold leading-tight text-slate-600 min-[370px]:text-xs sm:text-sm">
               {label}
             </span>
-            <strong className="mt-1.5 block truncate font-display text-xl text-slate-900 min-[370px]:text-2xl">
+            <strong className="mt-1.5 block truncate font-display text-lg text-slate-900 min-[370px]:text-xl sm:text-2xl">
               {value}
             </strong>
-            <small className="mt-1 block text-[10px] leading-tight text-slate-600 min-[370px]:text-xs">
-              {note}
-            </small>
-          </article>
+          </button>
         ))}
       </div>
-      <SectionJumpNav
-        items={[
-          { id: "fees-dues", label: "Renewals & dues" },
-          { id: "fees-archive", label: "Collection archive" },
-        ]}
-      />
       <SearchField
         value={feeSearch}
         onChange={setFeeSearch}
@@ -295,8 +303,11 @@ export function FeesPage({
         ariaLabel="Search fees and members"
         className="sm:hidden"
       />
-      <div className="grid gap-5 xl:grid-cols-[minmax(360px,.9fr)_minmax(0,1.1fr)]">
-        <article id="fees-dues" className="panel scroll-mt-24 p-4 sm:p-6">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(360px,.9fr)_minmax(0,1.1fr)]">
+        <article
+          id="fees-dues"
+          className="panel scroll-mt-24 p-4 sm:p-6 xl:row-span-2"
+        >
           <div className="section-title">
             <div>
               <div className="flex items-center gap-3">
@@ -305,7 +316,6 @@ export function FeesPage({
                   {visibleDue.length}
                 </StatusPill>
               </div>
-              <p>Unpaid, expired, or due within 7 days</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3">
@@ -333,15 +343,20 @@ export function FeesPage({
             )}
           </div>
         </article>
+        <MaintenanceArchive
+          expenses={data.maintenance}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          setModal={setModal}
+        />
         <article
           id="fees-archive"
-          className="panel scroll-mt-24 overflow-hidden"
+          className="panel scroll-mt-24 overflow-hidden xl:col-start-2"
         >
           <div className="p-4 sm:p-5">
             <div className="section-title">
               <div>
-                <h2>Collection archive</h2>
-                <p>Monthly totals and payment records</p>
+                <h2>Fee collection archive</h2>
                 {activeFilter && !invalidRange && (
                   <small className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-600">
                     {filteredLabel} · {money(filteredTotal)} · {payments.length}{" "}

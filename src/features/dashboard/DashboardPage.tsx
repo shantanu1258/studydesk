@@ -19,7 +19,8 @@ import {
   ShiftPicker,
 } from "../../components/workspace/SeatGrid";
 import type { ModalState, ViewId, WorkspaceData } from "../../types/domain";
-import { localDate, money, prettyDate } from "../../utils/format";
+import { earningsForMonth } from "../../utils/earnings";
+import { localDate, money, monthLabel, prettyDate } from "../../utils/format";
 import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 import {
@@ -61,19 +62,21 @@ function StatCard({
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm">
           {icon}
         </span>
-        <small className="font-bold leading-tight opacity-80">{label}</small>
+        <small className="text-[12px] font-bold leading-tight opacity-80 sm:text-sm">
+          {label}
+        </small>
       </div>
-      <strong className="mt-1.5 block font-display text-2xl leading-none text-slate-900">
+      <strong className="mt-1.5 block font-display text-[1.35rem] leading-none text-slate-900 sm:text-2xl">
         {value}
       </strong>
-      <em className="mt-1 block text-[11px] leading-tight not-italic opacity-75">
+      <em className="mt-1 block text-[10px] leading-tight not-italic opacity-75 sm:text-[11px]">
         {note}
       </em>
     </button>
   );
 }
 
-type DashboardModal = "seats" | "dues" | null;
+type DashboardModal = "seats" | "dues" | "earnings" | null;
 
 type DashboardActivity = {
   id: string;
@@ -143,10 +146,11 @@ export function DashboardPage({
   const demoPercent = percentOf(demoCount, data.settings.seatCount);
   const inUsePercent = percentOf(inUse, data.settings.seatCount);
   const month = localDate().slice(0, 7);
-  const monthlyFees = data.fees.filter((fee) => fee.date.startsWith(month));
-  const collected = monthlyFees.reduce(
-    (sum, fee) => sum + Number(fee.amount),
-    0,
+  const monthlyEarnings = earningsForMonth(data.fees, data.maintenance, month);
+  const currentMonthMaintenance = [...monthlyEarnings.expenses].sort(
+    (first, second) =>
+      second.date.localeCompare(first.date) ||
+      (second.createdAt || "").localeCompare(first.createdAt || ""),
   );
   const dueMembers = active
     .map((member) => ({
@@ -160,6 +164,10 @@ export function DashboardPage({
           Number(second.status.tone === "due") ||
         first.member.expiry.localeCompare(second.member.expiry),
     );
+  const overdueCount = dueMembers.filter(
+    ({ status }) => status.tone === "overdue",
+  ).length;
+  const upcomingDueCount = dueMembers.length - overdueCount;
   const visibleDueMembers = dueMembers.filter(({ member, status }) =>
     matchesSearch(dueSearch, [
       member.name,
@@ -246,6 +254,18 @@ export function DashboardPage({
         second.id.localeCompare(first.id),
     )
     .slice(0, 4);
+  const openEarningsSection = (id: string) => {
+    setDashboardModal(null);
+    openView("fees");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        document.getElementById(id)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      ),
+    );
+  };
   return (
     <>
       <section className="grid gap-3 min-[370px]:grid-cols-2 xl:grid-cols-4">
@@ -254,7 +274,7 @@ export function DashboardPage({
           icon={<UsersIcon className="size-5" />}
           label="Active members"
           value={active.length}
-          note={`${data.members.length} total records`}
+          note={`${data.members.length} total`}
           onClick={() => openView("members")}
         />
         <StatCard
@@ -268,17 +288,17 @@ export function DashboardPage({
         <StatCard
           tone="blue"
           icon={<RupeeIcon className="size-5" />}
-          label="Collected this month"
-          value={money(collected)}
-          note={`${monthlyFees.length} payments`}
-          onClick={() => openView("fees")}
+          label="Fees this month"
+          value={money(monthlyEarnings.feeIncome)}
+          note={`Net ${money(monthlyEarnings.netEarnings)}`}
+          onClick={() => setDashboardModal("earnings")}
         />
         <StatCard
           tone="coral"
           icon={<AlertIcon className="size-5" />}
-          label="Payments & renewals due"
+          label="Renewals due"
           value={dueMembers.length}
-          note="Unpaid, expired, or within 5 days"
+          note={`${overdueCount} overdue · ${upcomingDueCount} soon`}
           onClick={() => {
             setDueSearch("");
             setDashboardModal("dues");
@@ -298,12 +318,6 @@ export function DashboardPage({
           <div className="section-title">
             <div>
               <h2>Seat availability</h2>
-              <p>
-                <strong className="text-slate-800">
-                  {data.settings.library}
-                </strong>{" "}
-                · Select a seat to view or assign it
-              </p>
             </div>
             <ProgressIndicator
               label="Seat occupancy"
@@ -326,10 +340,7 @@ export function DashboardPage({
           className="panel scroll-mt-24 p-4 sm:p-6"
         >
           <div className="section-title">
-            <div>
-              <h2>Recent activity</h2>
-              <p>Latest desk updates</p>
-            </div>
+            <h2>Recent activity</h2>
           </div>
           <div className="mt-5 grid gap-3">
             {activities.length ? (
@@ -385,7 +396,6 @@ export function DashboardPage({
           <ModalHeader
             eyebrow="Seat occupancy"
             title="Occupancy by shift"
-            text={`${data.settings.seatCount} seats in ${data.settings.library}`}
             onClose={() => setDashboardModal(null)}
             id="seat-occupancy-title"
           />
@@ -447,6 +457,109 @@ export function DashboardPage({
           </div>
         </Modal>
       )}
+      {dashboardModal === "earnings" && (
+        <Modal
+          onClose={() => setDashboardModal(null)}
+          labelledBy="earnings-snapshot-title"
+        >
+          <ModalHeader
+            eyebrow="Earnings"
+            title={monthLabel(month)}
+            onClose={() => setDashboardModal(null)}
+            id="earnings-snapshot-title"
+          />
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[
+              ["Fees collected", monthlyEarnings.feeIncome, "fees-archive"],
+              [
+                "Maintenance",
+                monthlyEarnings.maintenancePaid,
+                "earnings-maintenance",
+              ],
+              [
+                "Net earnings",
+                monthlyEarnings.netEarnings,
+                "earnings-maintenance",
+              ],
+            ].map(([label, value, target], index) => (
+              <button
+                type="button"
+                key={label}
+                onClick={() => openEarningsSection(String(target))}
+                className={`min-w-0 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
+                  [
+                    "border-emerald-200 bg-emerald-50/70",
+                    "status-warning-surface",
+                    Number(value) < 0
+                      ? "status-danger-surface"
+                      : "border-sky-300 bg-sky-50/70",
+                  ][index]
+                }`}
+              >
+                <small className="block text-[10px] font-bold leading-tight text-slate-600 sm:text-xs">
+                  {label}
+                </small>
+                <strong className="mt-1 block truncate text-sm text-slate-900 sm:text-lg">
+                  {money(Number(value))}
+                </strong>
+              </button>
+            ))}
+          </div>
+          <div className="mt-5">
+            {currentMonthMaintenance.length ? (
+              <div className="grid gap-2">
+                {currentMonthMaintenance.slice(0, 4).map((expense) => (
+                  <div
+                    key={expense.id}
+                    className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <div className="min-w-0">
+                      <strong className="block text-sm text-slate-900">
+                        {expense.category}
+                      </strong>
+                      <small className="block truncate text-slate-500">
+                        {prettyDate(expense.date)}
+                        {expense.note ? ` · ${expense.note}` : ""}
+                      </small>
+                    </div>
+                    <b className="shrink-0 text-sm text-slate-900">
+                      {money(expense.amount)}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 grid min-h-24 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+                <strong className="text-sm text-slate-800">
+                  No maintenance recorded this month
+                </strong>
+              </div>
+            )}
+          </div>
+          <div className="modal-actions flex-wrap">
+            <Button variant="secondary" onClick={() => setDashboardModal(null)}>
+              Close
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDashboardModal(null);
+                openView("fees");
+              }}
+            >
+              Go to earnings
+            </Button>
+            <Button
+              onClick={() => {
+                setDashboardModal(null);
+                setModal({ type: "maintenance-add" });
+              }}
+            >
+              Add maintenance
+            </Button>
+          </div>
+        </Modal>
+      )}
       {dashboardModal === "dues" && (
         <Modal
           onClose={() => setDashboardModal(null)}
@@ -456,7 +569,6 @@ export function DashboardPage({
           <ModalHeader
             eyebrow="Payments"
             title="Payments & renewals due"
-            text="Overdue first, followed by upcoming renewals."
             onClose={() => setDashboardModal(null)}
             id="payments-due-title"
           />

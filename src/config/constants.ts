@@ -1,4 +1,10 @@
-import type { AppUser, Shift, ShiftType, ViewId } from "../types/domain";
+import type {
+  AppUser,
+  MaintenanceCategory,
+  Shift,
+  ShiftType,
+  ViewId,
+} from "../types/domain";
 
 export const STORAGE_KEYS = {
   session: "studydesk_session_v2",
@@ -72,10 +78,21 @@ export const DEFAULT_PRIMARY_COLOR = "#334155";
 export const DEFAULT_SECONDARY_COLOR = "#E2E8F0";
 export const PAYMENT_EDIT_REVIEW_DAYS = 4;
 
+export const MAINTENANCE_CATEGORIES: readonly MaintenanceCategory[] = [
+  "Electricity",
+  "Cleaning",
+  "Rent",
+  "Repairs",
+  "Internet",
+  "Supplies",
+  "Staff",
+  "Other",
+];
+
 export const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "members", label: "Members" },
-  { id: "fees", label: "Fees" },
+  { id: "fees", label: "Earnings" },
   { id: "attendance", label: "Attendance" },
   { id: "settings", label: "Settings" },
 ];

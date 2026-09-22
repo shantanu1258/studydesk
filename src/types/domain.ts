@@ -101,6 +101,25 @@ export interface Payment {
   periodEnd: string;
 }
 
+export type MaintenanceCategory =
+  | "Electricity"
+  | "Cleaning"
+  | "Rent"
+  | "Repairs"
+  | "Internet"
+  | "Supplies"
+  | "Staff"
+  | "Other";
+
+export interface MaintenanceExpense {
+  id: string;
+  category: MaintenanceCategory;
+  amount: number;
+  date: string;
+  note: string;
+  createdAt?: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   memberId: string;
@@ -113,6 +132,7 @@ export interface WorkspaceData {
   settings: LibrarySettings;
   members: Member[];
   fees: Payment[];
+  maintenance: MaintenanceExpense[];
   attendance: AttendanceRecord[];
   demoSeats: SeatDemo[];
 }
@@ -141,7 +161,10 @@ export type ModalState =
   | { type: "seat-actions"; seat: string; shift: string }
   | { type: "member-deactivate"; id: string }
   | { type: "payment-edit"; id: string; returnToMemberId?: string }
-  | { type: "payment-delete"; id: string };
+  | { type: "payment-delete"; id: string }
+  | { type: "maintenance-add" }
+  | { type: "maintenance-edit"; id: string }
+  | { type: "maintenance-delete"; id: string };
 
 export type ToastTone = "success" | "error" | "warning" | "info";
 
@@ -181,10 +204,12 @@ export interface WorkspaceChangeSet {
   p_settings: Record<string, unknown> | null;
   p_members: Record<string, unknown>[];
   p_payments: Record<string, unknown>[];
+  p_maintenance_expenses: Record<string, unknown>[];
   p_attendance: Record<string, unknown>[];
   p_demo_seats: Record<string, unknown>[];
   p_deleted_member_ids: string[];
   p_deleted_payment_ids: string[];
+  p_deleted_maintenance_expense_ids: string[];
   p_deleted_attendance_ids: string[];
   p_deleted_demo_seat_ids: string[];
 }

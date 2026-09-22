@@ -10,6 +10,7 @@ import { buildWorkspaceChanges } from "../src/repositories/workspaceRepository.t
 const libraryId = "6f7d7be0-cc62-44ca-a6ee-745383b66474";
 const memberId = "7c077146-b863-4f93-a381-7c85eb0ee59f";
 const paymentId = "21899891-d70e-4437-a99b-d0696a94cc78";
+const maintenanceId = "b277aa99-61fc-43ab-8b7f-4381038200ef";
 
 function workspace() {
   return {
@@ -65,6 +66,7 @@ function workspace() {
         periodEnd: "2026-10-01",
       },
     ],
+    maintenance: [],
     attendance: [],
     demoSeats: [],
   };
@@ -77,10 +79,39 @@ test("unchanged workspaces produce an empty database change set", () => {
   assert.equal(changes.p_settings, null);
   assert.deepEqual(changes.p_members, []);
   assert.deepEqual(changes.p_payments, []);
+  assert.deepEqual(changes.p_maintenance_expenses, []);
   assert.deepEqual(changes.p_attendance, []);
   assert.deepEqual(changes.p_demo_seats, []);
   assert.deepEqual(changes.p_deleted_member_ids, []);
+  assert.deepEqual(changes.p_deleted_maintenance_expense_ids, []);
   assert.deepEqual(changes.p_deleted_demo_seat_ids, []);
+});
+
+test("maintenance additions and removals are included in database changes", () => {
+  const previous = workspace();
+  const next = structuredClone(previous);
+  next.maintenance.push({
+    id: maintenanceId,
+    category: "Electricity",
+    amount: 850,
+    date: "2026-09-08",
+    note: "September meter bill",
+  });
+
+  const added = buildWorkspaceChanges(previous, next);
+  assert.deepEqual(added.p_maintenance_expenses, [
+    {
+      id: maintenanceId,
+      library_id: libraryId,
+      category: "Electricity",
+      amount_inr: 850,
+      paid_on: "2026-09-08",
+      note: "September meter bill",
+    },
+  ]);
+
+  const removed = buildWorkspaceChanges(next, previous);
+  assert.deepEqual(removed.p_deleted_maintenance_expense_ids, [maintenanceId]);
 });
 
 test("demo seat starts and stops are included in database changes", () => {

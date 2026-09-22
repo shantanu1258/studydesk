@@ -1985,6 +1985,12 @@ export function MemberDialogRouter({
       />
     );
   }
+  if (
+    modal.type === "maintenance-add" ||
+    modal.type === "maintenance-edit" ||
+    modal.type === "maintenance-delete"
+  )
+    return null;
   const member = data.members.find((item) => item.id === modal.id);
   if (!member) return null;
   if (modal.type === "member-fees")

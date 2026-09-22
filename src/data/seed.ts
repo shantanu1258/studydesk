@@ -105,6 +105,18 @@ export function seedData(
             periodEnd: addMonths(offset(-2), 1),
           },
         ],
+    maintenance: empty
+      ? []
+      : [
+          {
+            id: uid(),
+            category: "Electricity",
+            amount: 650,
+            date: today,
+            note: "Monthly electricity bill",
+            createdAt: new Date(`${today}T10:30:00`).toISOString(),
+          },
+        ],
     attendance: empty
       ? []
       : [
