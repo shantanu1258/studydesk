@@ -25,7 +25,7 @@ export function MemberCard({
   const status = memberStatus(member, data.fees);
   return (
     <article
-      className={`rounded-2xl border p-4 ${status.tone === "overdue" ? "status-danger-surface" : status.tone === "due" ? "status-warning-surface" : "border-slate-200 bg-white"}`}
+      className={`rounded-2xl border p-3 ${status.tone === "overdue" ? "status-danger-surface" : status.tone === "due" ? "status-warning-surface" : "border-slate-200 bg-white"}`}
     >
       <div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-sm font-extrabold text-slate-700">
@@ -39,7 +39,7 @@ export function MemberCard({
         </div>
         <StatusPill tone={status.tone}>{status.label}</StatusPill>
       </div>
-      <dl className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-white/70 p-3 text-sm">
+      <dl className="mt-2.5 grid grid-cols-3 gap-2 text-sm">
         <div>
           <dt className="text-xs text-slate-500">Seat</dt>
           <dd className="font-bold">{member.seat}</dd>
@@ -53,7 +53,12 @@ export function MemberCard({
           <dd className="font-bold">{prettyDate(member.expiry)}</dd>
         </div>
       </dl>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-2.5 flex items-center gap-2">
+        <PhoneLink
+          phone={member.phone}
+          name={member.name}
+          className="!size-7"
+        />
         <button
           className="flex-1 rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-sm font-extrabold text-[var(--accent-text)]"
           onClick={() => setModal({ type: "info", id: member.id })}
@@ -104,7 +109,14 @@ function MemberRow({
             <strong className="block truncate text-sm text-slate-900">
               {member.name}
             </strong>
-            <small className="block text-slate-500">{member.phone}</small>
+            <span className="flex items-center gap-2">
+              <small className="text-slate-500">{member.phone}</small>
+              <PhoneLink
+                phone={member.phone}
+                name={member.name}
+                className="!size-7"
+              />
+            </span>
           </div>
         </div>
       </td>

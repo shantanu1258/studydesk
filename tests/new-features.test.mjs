@@ -21,6 +21,7 @@ const styles = read("src/styles/index.css");
 const settings = read("src/features/settings/SettingsPage.tsx");
 const members = read("src/features/members/MembersPage.tsx");
 const phoneLink = read("src/components/ui/PhoneLink.tsx");
+const dueMemberCard = read("src/components/workspace/DueMemberCard.tsx");
 const checkboxCard = read("src/components/ui/CheckboxCard.tsx");
 const workspaceRepository = read("src/repositories/workspaceRepository.ts");
 const databaseSetup = read("supabase/studydesk.sql");
@@ -58,6 +59,35 @@ test("member phone numbers can open the dialler and WhatsApp", () => {
   assert.equal(whatsappPhone("+44 7700 900123"), "447700900123");
   assert.match(dialogs, /<PhoneLink/);
   assert.match(members, /<PhoneLink/);
+});
+
+test("due-member cards reuse member call and WhatsApp actions", () => {
+  assert.match(dashboard, /<DueMemberCard/);
+  assert.match(fees, /<DueMemberCard/);
+  assert.match(
+    dueMemberCard,
+    /<PhoneLink\s+phone=\{member\.phone\}\s+name=\{member\.name\}/,
+  );
+  assert.match(dueMemberCard, /onClick=\{onCollect\}/);
+  assert.match(dueMemberCard, /grid-cols-\[minmax\(0,\.65fr\)/);
+  assert.doesNotMatch(dueMemberCard, /col-span-2/);
+});
+
+test("member cards and desktop rows both expose contact actions", () => {
+  const memberCard = members.slice(
+    members.indexOf("export function MemberCard"),
+    members.indexOf("function MemberRow"),
+  );
+  const memberRow = members.slice(
+    members.indexOf("function MemberRow"),
+    members.indexOf("export function DemoCard"),
+  );
+  for (const surface of [memberCard, memberRow]) {
+    assert.match(
+      surface,
+      /<PhoneLink\s+phone=\{member\.phone\}\s+name=\{member\.name\}/,
+    );
+  }
 });
 
 test("available seat chips and tiles share a dark-mode-safe surface", () => {
@@ -133,9 +163,18 @@ test("fee archive uses collapsed month sections inside year groups", () => {
   assert.match(fees, /archive-month/);
   assert.match(fees, /open=\{yearStartsOpen/);
   assert.match(fees, /Boolean\(feeSearch\.trim\(\)\) \|\|/);
-  assert.match(fees, /Collected this month/);
+  assert.match(fees, /Earnings summary/);
   assert.doesNotMatch(fees, /Active-month average/);
   assert.doesNotMatch(fees, /Selected period/);
+  assert.match(
+    fees,
+    /searchParams\.get\("period"\) === "all" \? "all" : currentYear/,
+  );
+  assert.match(fees, /year === expandedYear/);
+  assert.match(
+    fees,
+    /focusedPayment\?\.date\.slice\(0, 7\) === month \|\|\s+month === expandedMonth/,
+  );
 });
 
 test("earnings include shared maintenance expenses and net income", () => {
@@ -164,9 +203,90 @@ test("earnings include shared maintenance expenses and net income", () => {
 });
 
 test("mobile summary cards retain their compact row layouts", () => {
-  assert.match(fees, /grid max-w-4xl grid-cols-3/);
+  assert.match(fees, /grid max-w-4xl grid-cols-3 gap-2/);
   assert.match(dashboard, /min-\[370px\]:grid-cols-2 xl:grid-cols-4/);
   assert.doesNotMatch(dashboard, /min-\[380px\]:grid-cols-2/);
+});
+
+test("earnings keep compact top tiles and simple current-year/month controls", () => {
+  assert.match(
+    fees,
+    /searchParams\.get\("period"\) === "all" \? "all" : today\.slice\(5, 7\)/,
+  );
+  assert.match(fees, /value=\{selectedYear\}/);
+  assert.match(fees, /value=\{selectedMonth\}/);
+  assert.match(fees, /earningsPeriodRange\(selectedYear, selectedMonth\)/);
+  assert.match(
+    fees,
+    /\["Net earnings", earnings\.netEarnings, "earnings-summary"\]/,
+  );
+  const summary = fees.slice(
+    fees.indexOf('<section id="earnings-summary"'),
+    fees.indexOf('id="fees-archive"'),
+  );
+  assert.match(summary, /<dl/);
+  assert.doesNotMatch(
+    summary,
+    /<button|Same period|After maintenance|Collected − Maintenance/,
+  );
+  assert.ok(
+    fees.indexOf('["Collected", earnings.feeIncome, "fees-archive"]') <
+      fees.indexOf("<SectionJumpNav"),
+  );
+});
+
+test("earnings sections prioritize dues and expand on jump or payment links", () => {
+  assert.match(fees, /\[duesOpen, setDuesOpen\] = useState\(true\)/);
+  assert.match(
+    fees,
+    /\[collectionsOpen, setCollectionsOpen\] = useState\(false\)/,
+  );
+  assert.match(
+    fees,
+    /\[maintenanceOpen, setMaintenanceOpen\] = useState\(false\)/,
+  );
+  assert.match(fees, /onJump=\{scrollToSection\}/);
+  assert.match(fees, /if \(id === "fees-archive"\) setCollectionsOpen\(true\)/);
+  assert.match(
+    fees,
+    /if \(id === "earnings-maintenance"\) setMaintenanceOpen\(true\)/,
+  );
+  assert.match(
+    fees,
+    /if \(!focusedPayment\) return;\s+setCollectionsOpen\(true\)/,
+  );
+  assert.match(
+    fees,
+    /if \(event\.target === event\.currentTarget\)\s+setCollectionsOpen/,
+  );
+  assert.match(
+    maintenanceArchive,
+    /if \(event\.target === event\.currentTarget\)\s+onOpenChange/,
+  );
+  assert.match(fees, /expenses=\{earnings\.expenses\}/);
+  assert.match(fees, /const hasDues = due\.length > 0/);
+  assert.match(fees, /if \(!hasDues\) priorityJumpItems\.reverse\(\)/);
+  const order = [
+    "{hasDues && renewalsSection}",
+    'id="earnings-summary"',
+    "{!hasDues && renewalsSection}",
+    'id="fees-archive"',
+  ].map((marker) => fees.indexOf(marker));
+  assert.ok(order[0] < order[1] && order[1] < order[2]);
+  assert.ok(order[2] < order[3]);
+  assert.ok(order[3] < fees.indexOf("<MaintenanceArchive"));
+});
+
+test("activity modal uses the full 30-day list without changing the home limit", () => {
+  assert.match(dashboard, /allActivities\.slice\(0, 4\)/);
+  assert.match(dashboard, /isWithinLast30Days\(activity\.sortAt, now\)/);
+  assert.match(dashboard, /recentActivities\.map/);
+  assert.match(dashboard, /setDashboardModal\("activity"\)/);
+  assert.match(dashboard, /eyebrow="Last 30 days"/);
+  assert.match(
+    dashboard,
+    /setDashboardModal\(null\);\s+openPayment\(paymentId\)/,
+  );
 });
 
 test("recent activity is time-sorted and fee entries deep-link to payments", () => {

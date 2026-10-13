@@ -20,7 +20,7 @@ export function PhoneLink({
   className?: string;
 }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5">
+    <span className="inline-flex shrink-0 items-center gap-2.5">
       <a
         href={`tel:${dialablePhone(phone)}`}
         className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-text)] transition hover:brightness-95 ${className}`}

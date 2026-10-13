@@ -53,6 +53,13 @@ export const daysSince = (date: string) =>
       86_400_000,
   );
 
+export function isWithinLast30Days(timestamp: string, now = new Date()) {
+  const start = new Date(now);
+  start.setDate(start.getDate() - 30);
+  const time = new Date(timestamp).getTime();
+  return time >= start.getTime() && time <= now.getTime();
+}
+
 export const money = (value: number | string) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",

@@ -17,7 +17,9 @@ StudyDesk is a lightweight management app for Indian self-study libraries, paid 
 - Per-member fee history with payment count, totals, and direct corrections
 - Persistent, shift-aware demo seats with optional visitor details and admission conversion
 - Configurable advance or later fee collection, including warned admission without payment
-- Monthly, yearly, custom-range, and lifetime fee reporting with CSV export
+- Monthly, yearly, and lifetime fee reporting with CSV export
+- Compact earnings tiles, priority renewals, shared year/month controls, and collapsible financial archives with expand-and-scroll section links
+- Latest four home activities plus a last-30-days activity modal with payment-detail links
 - Optional manual attendance, disabled by default
 - Configurable seat sections with continuous ranges such as A-01–A-20 and B-21–B-40
 - Seat count and library colours during setup, with editable library-wide theming
@@ -61,6 +63,33 @@ Then visit `http://localhost:3000` and choose **Use demo**. Demo records remain 
 On a compatible phone, use the **Install app** button. Android can show a native install prompt; iPhone and iPad display the Safari Home Screen steps. Installation on the live site requires HTTPS, which Cloudflare Pages provides automatically.
 
 Run `npm run check` to verify the application and create a production build.
+
+## Earnings and recent activity
+
+The Earnings page starts with compact **Collected**, **Maintenance**, and
+**Net earnings** tiles that open and scroll to their matching sections.
+**Renewals & dues** is the first section when payments need attention and starts
+expanded. When nothing is due, **Earnings summary** comes first instead. The jump
+links follow the same order; search results do not change section priority.
+**Jump to section** opens and scrolls to the selected section.
+
+The earnings summary uses simple **Year** and **Month** dropdowns, defaulting to
+the current year/month, and shows plain collected, maintenance, and net totals.
+Choose **All months** for annual totals or **All years** for lifetime totals.
+The selected period applies to both financial totals and archives, not to
+current renewals. Search narrows dues and collection lists without changing
+earnings totals.
+
+**Fee collections** and **Maintenance expenses** start collapsed, with totals
+in their headers. Click a header, a collection/maintenance tile, or a section
+jump to expand them. Inside each archive, the selected year and month start open
+(the current year/month for all-time views); older groups remain collapsed.
+Payment links reveal the corresponding archive
+entry, and the home page's monthly earnings links retain the monthly period.
+
+Home shows the latest four activities. **View all** opens a scrollable list of
+payments, check-ins, and check-outs from the last 30 days, newest first. Payment
+entries open their collection details.
 
 ## Connect real accounts and cloud data
 

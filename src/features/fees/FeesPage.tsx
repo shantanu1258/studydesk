@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -10,11 +11,12 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ChevronDownIcon } from "../../components/ui/Icons";
 import { SearchField } from "../../components/ui/SearchField";
+import { SectionJumpNav } from "../../components/ui/SectionJumpNav";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { DueMemberCard } from "../../components/workspace/DueMemberCard";
 import { PAYMENT_EDIT_REVIEW_DAYS } from "../../config/constants";
 import type { ModalState, Payment, WorkspaceData } from "../../types/domain";
-import { earningsForMonth } from "../../utils/earnings";
+import { earningsForPeriod, earningsPeriodRange } from "../../utils/earnings";
 import {
   daysSince,
   localDate,
@@ -26,50 +28,8 @@ import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 import { MaintenanceArchive } from "./MaintenanceArchive";
 
-const firstOfMonth = (date: string) => `${date.slice(0, 7)}-01`;
-const moveMonth = (date: string, amount: number) => {
-  const value = new Date(`${firstOfMonth(date)}T12:00:00`);
-  value.setMonth(value.getMonth() + amount);
-  return localDate(value);
-};
-const endOfMonth = (date: string) => {
-  const value = new Date(`${firstOfMonth(date)}T12:00:00`);
-  value.setMonth(value.getMonth() + 1);
-  value.setDate(0);
-  return localDate(value);
-};
-const presetRange = (preset: string, today: string): [string, string] => {
-  if (preset === "this-month") return [firstOfMonth(today), today];
-  if (preset === "last-month") {
-    const previous = moveMonth(today, -1);
-    return [firstOfMonth(previous), endOfMonth(previous)];
-  }
-  if (preset === "this-year") return [`${today.slice(0, 4)}-01-01`, today];
-  if (preset.startsWith("year-")) {
-    const year = preset.slice(5);
-    return [
-      `${year}-01-01`,
-      year === today.slice(0, 4) ? today : `${year}-12-31`,
-    ];
-  }
-  return ["", ""];
-};
 const csvCell = (value: unknown) =>
   `"${String(value ?? "").replaceAll('"', '""')}"`;
-const periodLabel = (
-  period: string,
-  from: string,
-  to: string,
-  today: string,
-) => {
-  if (period === "this-month") return monthLabel(today.slice(0, 7));
-  if (period === "last-month")
-    return monthLabel(moveMonth(today, -1).slice(0, 7));
-  if (period === "this-year") return today.slice(0, 4);
-  if (period.startsWith("year-")) return period.slice(5);
-  if (period === "all") return "All time";
-  return from && to ? `${prettyDate(from)}–${prettyDate(to)}` : "Custom range";
-};
 
 export function FeesPage({
   data,
@@ -86,15 +46,24 @@ export function FeesPage({
   const focusedPayment = data.fees.find(
     (payment) => payment.id === focusedPaymentId,
   );
-  const [period, setPeriod] = useState("this-month");
-  const [customFrom, setCustomFrom] = useState(firstOfMonth(today));
-  const [customTo, setCustomTo] = useState(today);
+  const [selectedYear, setSelectedYear] = useState(
+    searchParams.get("period") === "all" ? "all" : currentYear,
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    searchParams.get("period") === "all" ? "all" : today.slice(5, 7),
+  );
+  const [duesOpen, setDuesOpen] = useState(true);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [feeSearch, setFeeSearch] = useState("");
   const years = [
-    ...new Set(data.fees.map((payment) => payment.date.slice(0, 4))),
-  ]
-    .filter((year) => year !== today.slice(0, 4))
-    .sort((a, b) => b.localeCompare(a));
+    ...new Set([
+      currentYear,
+      ...[...data.fees, ...data.maintenance].map((record) =>
+        record.date.slice(0, 4),
+      ),
+    ]),
+  ].sort((a, b) => b.localeCompare(a));
   const statusByMember = new Map(
     data.members.map((member) => [
       member.id,
@@ -123,10 +92,13 @@ export function FeesPage({
       status.label,
     ]);
   });
-  const [presetFrom, presetTo] = presetRange(period, today);
-  const from = period === "custom" ? customFrom : presetFrom;
-  const to = period === "custom" ? customTo : presetTo;
-  const invalidRange = period === "custom" && Boolean(from && to && from > to);
+  const hasDues = due.length > 0;
+  const priorityJumpItems = [
+    { id: "fees-dues", label: "Renewals & dues" },
+    { id: "earnings-summary", label: "Earnings summary" },
+  ];
+  if (!hasDues) priorityJumpItems.reverse();
+  const [from, to] = earningsPeriodRange(selectedYear, selectedMonth);
   const payments = useMemo(
     () =>
       [...data.fees]
@@ -135,7 +107,6 @@ export function FeesPage({
             (item) => item.id === payment.memberId,
           );
           return (
-            !invalidRange &&
             (!from || payment.date >= from) &&
             (!to || payment.date <= to) &&
             matchesSearch(feeSearch, [
@@ -150,17 +121,13 @@ export function FeesPage({
           );
         })
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [data.fees, data.members, feeSearch, from, to, invalidRange],
+    [data.fees, data.members, feeSearch, from, to],
   );
   const filteredTotal = payments.reduce(
     (sum, payment) => sum + Number(payment.amount),
     0,
   );
-  const thisMonthEarnings = earningsForMonth(
-    data.fees,
-    data.maintenance,
-    currentMonth,
-  );
+  const earnings = earningsForPeriod(data.fees, data.maintenance, from, to);
   const groups = payments.reduce<Map<string, Payment[]>>((map, payment) => {
     const month = payment.date.slice(0, 7);
     map.set(month, [...(map.get(month) || []), payment]);
@@ -179,22 +146,27 @@ export function FeesPage({
       new Map(),
     ),
   ].sort(([first], [second]) => second.localeCompare(first));
-  const activeFilter =
-    period !== "this-month" || Boolean(feeSearch.trim()) || invalidRange;
-  const filteredLabel = periodLabel(period, from, to, today);
+  const filteredLabel =
+    selectedYear === "all"
+      ? "All time"
+      : selectedMonth === "all"
+        ? selectedYear
+        : monthLabel(`${selectedYear}-${selectedMonth}`);
+  const expandedYear = selectedYear === "all" ? currentYear : selectedYear;
+  const expandedMonth =
+    selectedYear === "all" || selectedMonth === "all"
+      ? currentMonth
+      : `${selectedYear}-${selectedMonth}`;
   const yearStartsOpen = (year: string) =>
     Boolean(feeSearch.trim()) ||
     focusedPayment?.date.slice(0, 4) === year ||
-    period === `year-${year}` ||
-    (period !== "all" && yearlyGroups.length === 1) ||
-    year === currentYear;
+    year === expandedYear;
 
   useEffect(() => {
     if (!focusedPayment) return;
-    const paymentYear = focusedPayment.date.slice(0, 4);
-    setPeriod(
-      paymentYear === currentYear ? "this-year" : `year-${paymentYear}`,
-    );
+    setCollectionsOpen(true);
+    setSelectedYear(focusedPayment.date.slice(0, 4));
+    setSelectedMonth(focusedPayment.date.slice(5, 7));
     setFeeSearch("");
   }, [currentYear, focusedPayment?.date, focusedPayment?.id]);
 
@@ -204,17 +176,33 @@ export function FeesPage({
   );
 
   useEffect(() => {
-    if (!focusedPaymentId || !focusedPaymentVisible) return;
+    if (!focusedPaymentId || !focusedPaymentVisible || !collectionsOpen) return;
     const frame = requestAnimationFrame(() => {
       const paymentRow = document.getElementById(`payment-${focusedPaymentId}`);
       paymentRow?.scrollIntoView({ behavior: "smooth", block: "center" });
       paymentRow?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
-  }, [focusedPaymentId, focusedPaymentVisible]);
+  }, [focusedPaymentId, focusedPaymentVisible, collectionsOpen]);
+
+  const scrollToSection = useCallback((id: string) => {
+    if (id === "fees-dues") setDuesOpen(true);
+    if (id === "fees-archive") setCollectionsOpen(true);
+    if (id === "earnings-maintenance") setMaintenanceOpen(true);
+    requestAnimationFrame(() =>
+      document.getElementById(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      }),
+    );
+  }, []);
+  const requestedSection = searchParams.get("section");
+  useEffect(() => {
+    if (requestedSection) scrollToSection(requestedSection);
+  }, [requestedSection, scrollToSection]);
 
   function downloadReport() {
-    if (!payments.length || invalidRange) return;
+    if (!payments.length) return;
     const rows: unknown[][] = [
       [
         "Payment date",
@@ -247,366 +235,388 @@ export function FeesPage({
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  const scrollToSection = (id: string) =>
-    document.getElementById(id)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  const renewalsSection = (
+    <details
+      id="fees-dues"
+      open={duesOpen}
+      onToggle={(event) => {
+        if (event.target === event.currentTarget)
+          setDuesOpen(event.currentTarget.open);
+      }}
+      className="panel archive-disclosure scroll-mt-24 overflow-hidden"
+    >
+      <summary className="flex cursor-pointer items-center justify-between gap-3 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-display text-xl font-bold sm:text-2xl">
+            Renewals & dues
+          </h2>
+          <StatusPill tone={visibleDue.length ? "overdue" : "active"}>
+            {visibleDue.length}
+          </StatusPill>
+        </div>
+        <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
+      </summary>
+      <div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">
+        {visibleDue.length ? (
+          visibleDue.map((member) => {
+            const status = statusByMember.get(member.id)!;
+            return (
+              <DueMemberCard
+                key={member.id}
+                member={member}
+                status={status}
+                onCollect={() => setModal({ type: "renew", id: member.id })}
+              />
+            );
+          })
+        ) : (
+          <EmptyState
+            title={due.length ? "No matching members" : "Nothing due"}
+            text={
+              due.length
+                ? "Try a different name, phone, seat or shift."
+                : "All memberships are up to date."
+            }
+          />
+        )}
+      </div>
+    </details>
+  );
 
   return (
     <section className="grid gap-5">
-      <div className="grid max-w-4xl grid-cols-3 gap-2 sm:gap-3">
-        {[
-          [
-            "Collected this month",
-            money(thisMonthEarnings.feeIncome),
-            "fees-archive",
-          ],
-          [
-            "Maintenance",
-            money(thisMonthEarnings.maintenancePaid),
-            "earnings-maintenance",
-          ],
-          [
-            "Net earnings",
-            money(thisMonthEarnings.netEarnings),
-            "earnings-maintenance",
-          ],
-        ].map(([label, value, target], index) => (
-          <button
-            type="button"
-            key={label}
-            onClick={() => scrollToSection(target)}
-            className={`min-w-0 rounded-[1.2rem] border-2 p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] sm:p-4 ${
-              [
-                "border-emerald-200 bg-emerald-50/70",
-                "status-warning-surface",
-                thisMonthEarnings.netEarnings < 0
-                  ? "status-danger-surface"
-                  : "border-sky-300 bg-sky-50/70",
-              ][index]
-            }`}
-          >
-            <span className="block text-[10px] font-bold leading-tight text-slate-600 min-[370px]:text-xs sm:text-sm">
-              {label}
-            </span>
-            <strong className="mt-1.5 block truncate font-display text-lg text-slate-900 min-[370px]:text-xl sm:text-2xl">
-              {value}
-            </strong>
-          </button>
-        ))}
+      <div>
+        <p className="mb-2 text-xs font-semibold text-slate-500">
+          {filteredLabel}
+        </p>
+        <div className="grid max-w-4xl grid-cols-3 gap-2 sm:gap-3">
+          {[
+            ["Collected", earnings.feeIncome, "fees-archive"],
+            ["Maintenance", earnings.maintenancePaid, "earnings-maintenance"],
+            ["Net earnings", earnings.netEarnings, "earnings-summary"],
+          ].map(([label, value, target], index) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => scrollToSection(String(target))}
+              className={`min-w-0 rounded-[1.2rem] border-2 p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] sm:p-4 ${
+                [
+                  "border-emerald-200 bg-emerald-50/70",
+                  "status-warning-surface",
+                  earnings.netEarnings < 0
+                    ? "status-danger-surface"
+                    : "border-sky-300 bg-sky-50/70",
+                ][index]
+              }`}
+            >
+              <span className="block text-[10px] font-bold leading-tight text-slate-600 min-[370px]:text-xs sm:text-sm">
+                {label}
+              </span>
+              <strong className="mt-1.5 block break-words font-display text-lg text-slate-900 min-[370px]:text-xl sm:text-2xl">
+                {money(value)}
+              </strong>
+            </button>
+          ))}
+        </div>
       </div>
+      <SectionJumpNav
+        mobileOnly={false}
+        onJump={scrollToSection}
+        items={[
+          ...priorityJumpItems,
+          { id: "fees-archive", label: "Fee collections" },
+          { id: "earnings-maintenance", label: "Maintenance" },
+        ]}
+      />
       <SearchField
         value={feeSearch}
         onChange={setFeeSearch}
         placeholder="Search dues and collections"
         ariaLabel="Search fees and members"
-        className="sm:hidden"
       />
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(360px,.9fr)_minmax(0,1.1fr)]">
-        <article
-          id="fees-dues"
-          className="panel scroll-mt-24 p-4 sm:p-6 xl:row-span-2"
-        >
-          <div className="section-title">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2>Renewals & dues</h2>
-                <StatusPill tone={visibleDue.length ? "overdue" : "active"}>
-                  {visibleDue.length}
-                </StatusPill>
-              </div>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3">
-            {visibleDue.length ? (
-              visibleDue.map((member) => {
-                const status = statusByMember.get(member.id)!;
-                return (
-                  <DueMemberCard
-                    key={member.id}
-                    member={member}
-                    status={status}
-                    onCollect={() => setModal({ type: "renew", id: member.id })}
-                  />
-                );
-              })
-            ) : (
-              <EmptyState
-                title={due.length ? "No matching members" : "Nothing due"}
-                text={
-                  due.length
-                    ? "Try a different name, phone, seat or shift."
-                    : "All memberships are up to date."
-                }
-              />
-            )}
-          </div>
-        </article>
-        <MaintenanceArchive
-          expenses={data.maintenance}
-          currentMonth={currentMonth}
-          currentYear={currentYear}
-          setModal={setModal}
-        />
-        <article
-          id="fees-archive"
-          className="panel scroll-mt-24 overflow-hidden xl:col-start-2"
-        >
-          <div className="p-4 sm:p-5">
-            <div className="section-title">
-              <div>
-                <h2>Fee collection archive</h2>
-                {activeFilter && !invalidRange && (
-                  <small className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-600">
-                    {filteredLabel} · {money(filteredTotal)} · {payments.length}{" "}
-                    {payments.length === 1 ? "payment" : "payments"}
-                  </small>
-                )}
-              </div>
-              <Button
-                variant="secondary"
-                disabled={!payments.length || invalidRange}
-                onClick={downloadReport}
-              >
-                Download CSV
-              </Button>
-            </div>
-            <div
-              className={`mt-4 grid gap-3 ${period === "custom" ? "sm:grid-cols-2 2xl:grid-cols-4" : "sm:grid-cols-[minmax(180px,260px)_minmax(260px,1fr)]"}`}
+      {hasDues && renewalsSection}
+      <section id="earnings-summary" className="panel scroll-mt-24 p-4 sm:p-5">
+        <div className="section-title">
+          <h2>Earnings summary</h2>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:max-w-lg">
+          <label>
+            Year
+            <select
+              value={selectedYear}
+              onChange={(event) => {
+                const year = event.target.value;
+                setSelectedYear(year);
+                if (year === "all") setSelectedMonth("all");
+              }}
             >
-              <label>
-                Period
-                <select
-                  value={period}
-                  onChange={(event) => setPeriod(event.target.value)}
-                >
-                  <option value="this-month">This month</option>
-                  <option value="last-month">Last month</option>
-                  <option value="this-year">This year</option>
-                  {years.map((year) => (
-                    <option key={year} value={`year-${year}`}>
-                      Calendar year {year}
-                    </option>
-                  ))}
-                  <option value="all">All time</option>
-                  <option value="custom">Custom range</option>
-                </select>
-              </label>
-              {period === "custom" && (
-                <>
-                  <label>
-                    From
-                    <input
-                      type="date"
-                      max={today}
-                      value={customFrom}
-                      onChange={(event) => setCustomFrom(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    To
-                    <input
-                      type="date"
-                      max={today}
-                      value={customTo}
-                      onChange={(event) => setCustomTo(event.target.value)}
-                    />
-                  </label>
-                </>
-              )}
-              <label
-                className={`hidden sm:grid ${period === "custom" ? "sm:col-span-2 2xl:col-span-1" : ""}`}
-              >
-                Search dues & archive
-                <SearchField
-                  value={feeSearch}
-                  onChange={setFeeSearch}
-                  placeholder="Member, phone, seat or payment mode"
-                  ariaLabel="Search fees and members"
-                />
-              </label>
-            </div>
-            {invalidRange && (
-              <p className="field-error mt-3">
-                The end date must be on or after the start date.
-              </p>
-            )}
-          </div>
-          <div className="border-t border-slate-200">
-            {yearlyGroups.length ? (
-              yearlyGroups.map(([year, yearMonths]) => {
-                const yearPayments = yearMonths.flatMap(([, items]) => items);
-                const yearTotal = yearPayments.reduce(
-                  (sum, payment) => sum + payment.amount,
-                  0,
-                );
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+              <option value="all">All years</option>
+            </select>
+          </label>
+          <label>
+            Month
+            <select
+              value={selectedMonth}
+              disabled={selectedYear === "all"}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            >
+              <option value="all">All months</option>
+              {Array.from({ length: 12 }, (_, index) => {
+                const month = String(index + 1).padStart(2, "0");
                 return (
-                  <details
-                    key={year}
-                    open={yearStartsOpen(year)}
-                    className="archive-disclosure archive-year border-b border-slate-200 last:border-0"
-                  >
-                    <summary className="flex cursor-pointer items-center justify-between gap-3 bg-slate-100 px-4 py-3.5 transition hover:bg-slate-200/70 sm:px-5">
-                      <span className="flex min-w-0 items-center gap-3">
-                        <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
-                        <span>
-                          <strong className="block font-display text-xl text-slate-900">
-                            {year}
-                          </strong>
-                          <small className="text-slate-500">
-                            {yearMonths.length}{" "}
-                            {yearMonths.length === 1 ? "month" : "months"} ·{" "}
-                            {yearPayments.length}{" "}
-                            {yearPayments.length === 1 ? "payment" : "payments"}
-                          </small>
-                        </span>
+                  <option key={month} value={month}>
+                    {new Intl.DateTimeFormat("en-IN", { month: "long" }).format(
+                      new Date(2026, index, 1),
+                    )}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        </div>
+        <dl className="mt-4 divide-y divide-slate-200 border-t border-slate-200">
+          {[
+            ["Collected", earnings.feeIncome],
+            ["Maintenance", earnings.maintenancePaid],
+            ["Net earnings", earnings.netEarnings],
+          ].map(([label, amount]) => (
+            <div
+              key={label}
+              className={`flex items-center justify-between gap-3 py-3 text-sm ${label === "Net earnings" ? "font-extrabold text-slate-900" : "text-slate-600"}`}
+            >
+              <dt>{label}</dt>
+              <dd
+                className={
+                  label === "Net earnings" && earnings.netEarnings < 0
+                    ? "status-danger-text"
+                    : "font-bold"
+                }
+              >
+                {money(amount)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      {!hasDues && renewalsSection}
+      <details
+        id="fees-archive"
+        open={collectionsOpen}
+        onToggle={(event) => {
+          if (event.target === event.currentTarget)
+            setCollectionsOpen(event.currentTarget.open);
+        }}
+        className="panel archive-disclosure scroll-mt-24 overflow-hidden"
+      >
+        <summary className="flex cursor-pointer items-center justify-between gap-3 p-4 sm:p-5">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-bold sm:text-2xl">
+              Fee collections
+            </h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              {`${filteredLabel} · ${money(filteredTotal)} · ${payments.length} ${payments.length === 1 ? "payment" : "payments"}${feeSearch.trim() ? " matching search" : ""}`}
+            </p>
+          </div>
+          <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
+        </summary>
+        <div className="border-t border-slate-200 p-4 sm:px-5">
+          <Button
+            variant="secondary"
+            disabled={!payments.length}
+            onClick={downloadReport}
+          >
+            Download CSV
+          </Button>
+        </div>
+        <div>
+          {yearlyGroups.length ? (
+            yearlyGroups.map(([year, yearMonths]) => {
+              const yearPayments = yearMonths.flatMap(([, items]) => items);
+              const yearTotal = yearPayments.reduce(
+                (sum, payment) => sum + payment.amount,
+                0,
+              );
+              return (
+                <details
+                  key={year}
+                  open={yearStartsOpen(year)}
+                  className="archive-disclosure archive-year border-b border-slate-200 last:border-0"
+                >
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 bg-slate-100 px-4 py-3.5 transition hover:bg-slate-200/70 sm:px-5">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
+                      <span>
+                        <strong className="block font-display text-xl text-slate-900">
+                          {year}
+                        </strong>
+                        <small className="text-slate-500">
+                          {yearMonths.length}{" "}
+                          {yearMonths.length === 1 ? "month" : "months"} ·{" "}
+                          {yearPayments.length}{" "}
+                          {yearPayments.length === 1 ? "payment" : "payments"}
+                        </small>
                       </span>
-                      <b className="whitespace-nowrap text-slate-900">
-                        {money(yearTotal)}
-                      </b>
-                    </summary>
-                    <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2.5 sm:p-3">
-                      {yearMonths.map(([month, monthPayments]) => {
-                        const monthTotal = monthPayments.reduce(
-                          (sum, payment) => sum + payment.amount,
-                          0,
-                        );
-                        return (
-                          <details
-                            key={month}
-                            open={
-                              Boolean(feeSearch.trim()) ||
-                              focusedPayment?.date.slice(0, 7) === month
-                            }
-                            className="archive-disclosure archive-month ml-2 rounded-xl border border-slate-200 bg-white sm:ml-4"
-                          >
-                            <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-xl p-3 transition hover:bg-slate-50 sm:px-4">
-                              <span className="flex min-w-0 items-center gap-2.5">
-                                <ChevronDownIcon className="archive-chevron size-4 shrink-0 text-slate-500" />
-                                <span>
-                                  <strong className="block text-sm text-slate-900 sm:text-base">
-                                    {monthLabel(month)}
-                                  </strong>
-                                  <small className="text-slate-500">
-                                    {monthPayments.length}{" "}
-                                    {monthPayments.length === 1
-                                      ? "payment"
-                                      : "payments"}
-                                  </small>
-                                </span>
+                    </span>
+                    <b className="whitespace-nowrap text-slate-900">
+                      {money(yearTotal)}
+                    </b>
+                  </summary>
+                  <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2.5 sm:p-3">
+                    {yearMonths.map(([month, monthPayments]) => {
+                      const monthTotal = monthPayments.reduce(
+                        (sum, payment) => sum + payment.amount,
+                        0,
+                      );
+                      return (
+                        <details
+                          key={month}
+                          open={
+                            Boolean(feeSearch.trim()) ||
+                            focusedPayment?.date.slice(0, 7) === month ||
+                            month === expandedMonth
+                          }
+                          className="archive-disclosure archive-month ml-2 rounded-xl border border-slate-200 bg-white sm:ml-4"
+                        >
+                          <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-xl p-3 transition hover:bg-slate-50 sm:px-4">
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <ChevronDownIcon className="archive-chevron size-4 shrink-0 text-slate-500" />
+                              <span>
+                                <strong className="block text-sm text-slate-900 sm:text-base">
+                                  {monthLabel(month)}
+                                </strong>
+                                <small className="text-slate-500">
+                                  {monthPayments.length}{" "}
+                                  {monthPayments.length === 1
+                                    ? "payment"
+                                    : "payments"}
+                                </small>
                               </span>
-                              <b className="whitespace-nowrap text-sm text-slate-900 sm:text-base">
-                                {money(monthTotal)}
-                              </b>
-                            </summary>
-                            <div className="ml-3 grid gap-px border-l border-slate-200 bg-slate-200 sm:ml-5">
-                              {monthPayments.map((payment) => {
-                                const deletable =
-                                  daysSince(payment.date) >= 0 &&
-                                  daysSince(payment.date) <=
-                                    PAYMENT_EDIT_REVIEW_DAYS;
-                                const member = data.members.find(
-                                  (item) => item.id === payment.memberId,
-                                );
-                                return (
-                                  <div
-                                    id={`payment-${payment.id}`}
-                                    tabIndex={-1}
-                                    className={`scroll-mt-28 grid gap-3 p-3 outline-none transition sm:grid-cols-[1fr_auto] sm:p-4 ${
-                                      focusedPaymentId === payment.id
-                                        ? "relative z-10 bg-[var(--surface-panel)] ring-2 ring-inset ring-[var(--brand)]"
-                                        : "bg-white"
-                                    }`}
-                                    key={payment.id}
-                                  >
-                                    <div>
-                                      <strong>
-                                        {payment.memberName ||
-                                          member?.name ||
-                                          "Member"}
-                                        {member?.phone && (
-                                          <span className="whitespace-nowrap font-semibold text-slate-600">
-                                            {" "}
-                                            ({member.phone})
-                                          </span>
-                                        )}
-                                      </strong>
-                                      <small className="mt-1 block text-slate-600">
-                                        {prettyDate(payment.date)} ·{" "}
-                                        {payment.seat ||
-                                          member?.seat ||
-                                          "Seat not recorded"}{" "}
-                                        · {payment.mode}
-                                      </small>
-                                      <small className="block text-slate-500">
-                                        Covers {prettyDate(payment.periodStart)}
-                                        –{prettyDate(payment.periodEnd)}
-                                      </small>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
-                                      <b>{money(payment.amount)}</b>
-                                      <span className="flex gap-2 sm:mt-2">
+                            </span>
+                            <b className="whitespace-nowrap text-sm text-slate-900 sm:text-base">
+                              {money(monthTotal)}
+                            </b>
+                          </summary>
+                          <div className="ml-3 grid gap-px border-l border-slate-200 bg-slate-200 sm:ml-5">
+                            {monthPayments.map((payment) => {
+                              const deletable =
+                                daysSince(payment.date) >= 0 &&
+                                daysSince(payment.date) <=
+                                  PAYMENT_EDIT_REVIEW_DAYS;
+                              const member = data.members.find(
+                                (item) => item.id === payment.memberId,
+                              );
+                              return (
+                                <div
+                                  id={`payment-${payment.id}`}
+                                  tabIndex={-1}
+                                  className={`scroll-mt-28 grid gap-3 p-3 outline-none transition sm:grid-cols-[1fr_auto] sm:p-4 ${
+                                    focusedPaymentId === payment.id
+                                      ? "relative z-10 bg-[var(--surface-panel)] ring-2 ring-inset ring-[var(--brand)]"
+                                      : "bg-white"
+                                  }`}
+                                  key={payment.id}
+                                >
+                                  <div>
+                                    <strong>
+                                      {payment.memberName ||
+                                        member?.name ||
+                                        "Member"}
+                                      {member?.phone && (
+                                        <span className="whitespace-nowrap font-semibold text-slate-600">
+                                          {" "}
+                                          ({member.phone})
+                                        </span>
+                                      )}
+                                    </strong>
+                                    <small className="mt-1 block text-slate-600">
+                                      {prettyDate(payment.date)} ·{" "}
+                                      {payment.seat ||
+                                        member?.seat ||
+                                        "Seat not recorded"}{" "}
+                                      · {payment.mode}
+                                    </small>
+                                    <small className="block text-slate-500">
+                                      Covers {prettyDate(payment.periodStart)}–
+                                      {prettyDate(payment.periodEnd)}
+                                    </small>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+                                    <b>{money(payment.amount)}</b>
+                                    <span className="flex gap-2 sm:mt-2">
+                                      <button
+                                        className="text-xs font-extrabold text-slate-700 underline"
+                                        onClick={() =>
+                                          setModal({
+                                            type: "payment-edit",
+                                            id: payment.id,
+                                          })
+                                        }
+                                      >
+                                        Edit
+                                      </button>
+                                      {deletable ? (
                                         <button
-                                          className="text-xs font-extrabold text-slate-700 underline"
+                                          className="status-danger-text text-xs font-extrabold underline"
                                           onClick={() =>
                                             setModal({
-                                              type: "payment-edit",
+                                              type: "payment-delete",
                                               id: payment.id,
                                             })
                                           }
                                         >
-                                          Edit
+                                          Delete
                                         </button>
-                                        {deletable ? (
-                                          <button
-                                            className="status-danger-text text-xs font-extrabold underline"
-                                            onClick={() =>
-                                              setModal({
-                                                type: "payment-delete",
-                                                id: payment.id,
-                                              })
-                                            }
-                                          >
-                                            Delete
-                                          </button>
-                                        ) : (
-                                          <small className="font-semibold text-slate-400">
-                                            Delete locked
-                                          </small>
-                                        )}
-                                      </span>
-                                    </div>
+                                      ) : (
+                                        <small className="font-semibold text-slate-400">
+                                          Delete locked
+                                        </small>
+                                      )}
+                                    </span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
-                  </details>
-                );
-              })
-            ) : (
-              <div className="p-5">
-                <EmptyState
-                  title={
-                    feeSearch.trim()
-                      ? "No matching payments"
-                      : "No payments in this period"
-                  }
-                  text={
-                    feeSearch.trim()
-                      ? "Try a different member, phone, seat or payment mode."
-                      : "Choose a wider date range or record a collection."
-                  }
-                />
-              </div>
-            )}
-          </div>
-        </article>
-      </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            })
+          ) : (
+            <div className="p-5">
+              <EmptyState
+                title={
+                  feeSearch.trim()
+                    ? "No matching payments"
+                    : "No payments in this period"
+                }
+                text={
+                  feeSearch.trim()
+                    ? "Try a different member, phone, seat or payment mode."
+                    : "Choose a wider date range or record a collection."
+                }
+              />
+            </div>
+          )}
+        </div>
+      </details>
+      <MaintenanceArchive
+        key={`${selectedYear}-${selectedMonth}`}
+        expenses={earnings.expenses}
+        currentMonth={expandedMonth}
+        currentYear={expandedYear}
+        setModal={setModal}
+        open={maintenanceOpen}
+        onOpenChange={setMaintenanceOpen}
+        periodLabel={filteredLabel}
+      />
     </section>
   );
 }

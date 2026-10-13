@@ -2,6 +2,7 @@ import type { Member } from "../../types/domain";
 import { prettyDate } from "../../utils/format";
 import type { memberStatus } from "../../utils/members";
 import { Button } from "../ui/Button";
+import { PhoneLink } from "../ui/PhoneLink";
 import { StatusPill } from "../ui/StatusPill";
 
 type MemberStatus = ReturnType<typeof memberStatus>;
@@ -22,23 +23,25 @@ export function DueMemberCard({
       className={`rounded-2xl border p-3 ${status.tone === "overdue" ? "status-danger-surface" : "status-warning-surface"}`}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-        <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-base font-extrabold leading-snug text-slate-900">
-          <span>{member.name}</span>
-          <span className="whitespace-nowrap text-sm font-semibold text-slate-600">
-            ({member.phone})
-          </span>
-        </h3>
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-extrabold leading-snug text-slate-900">
+            {member.name}
+          </h3>
+          <p className="mt-0.5 text-xs font-semibold text-slate-600">
+            {member.phone}
+          </p>
+        </div>
         <StatusPill tone={status.tone} className="shrink-0">
           {status.label}
         </StatusPill>
       </div>
 
-      <dl className="mt-2.5 grid grid-cols-2 gap-2.5 rounded-xl border border-black/5 bg-white/65 p-2.5 sm:grid-cols-3">
+      <dl className="mt-2 grid grid-cols-[minmax(0,.65fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2">
         <div>
           <dt className="text-[10px] font-extrabold tracking-[0.12em] text-slate-500 uppercase">
             Seat
           </dt>
-          <dd className="mt-0.5 text-sm font-bold text-slate-800">
+          <dd className="mt-0.5 break-words text-xs font-bold text-slate-800">
             {member.seat || "Not assigned"}
           </dd>
         </div>
@@ -46,23 +49,30 @@ export function DueMemberCard({
           <dt className="text-[10px] font-extrabold tracking-[0.12em] text-slate-500 uppercase">
             Shift
           </dt>
-          <dd className="mt-0.5 text-sm font-bold text-slate-800">
+          <dd className="mt-0.5 break-words text-xs font-bold text-slate-800">
             {member.shift}
           </dd>
         </div>
-        <div className="col-span-2 sm:col-span-1">
+        <div>
           <dt className="text-[10px] font-extrabold tracking-[0.12em] text-slate-500 uppercase">
             Valid until
           </dt>
-          <dd className="mt-0.5 text-sm font-bold text-slate-800">
+          <dd className="mt-0.5 text-xs font-bold text-slate-800">
             {prettyDate(member.expiry)}
           </dd>
         </div>
       </dl>
 
-      <Button className="mt-2.5 w-full" onClick={onCollect}>
-        {hasPayment ? "Collect fee" : "Add payment"}
-      </Button>
+      <div className="mt-2.5 flex items-center gap-3">
+        <PhoneLink
+          phone={member.phone}
+          name={member.name}
+          className="!size-7"
+        />
+        <Button className="min-w-0 flex-1" onClick={onCollect}>
+          {hasPayment ? "Collect fee" : "Add payment"}
+        </Button>
+      </div>
     </article>
   );
 }

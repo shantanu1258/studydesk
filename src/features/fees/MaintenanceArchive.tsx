@@ -24,7 +24,10 @@ function ArchiveDisclosure({
   return (
     <details
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        if (event.target === event.currentTarget)
+          setOpen(event.currentTarget.open);
+      }}
       className={className}
     >
       {children}
@@ -37,11 +40,17 @@ export function MaintenanceArchive({
   currentMonth,
   currentYear,
   setModal,
+  open,
+  onOpenChange,
+  periodLabel,
 }: {
   expenses: MaintenanceExpense[];
   currentMonth: string;
   currentYear: string;
   setModal: Dispatch<SetStateAction<ModalState | null>>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  periodLabel: string;
 }) {
   const monthlyGroups = [
     ...expenses.reduce<Map<string, MaintenanceExpense[]>>((map, expense) => {
@@ -69,18 +78,32 @@ export function MaintenanceArchive({
   ].sort(([first], [second]) => second.localeCompare(first));
 
   return (
-    <article
+    <details
       id="earnings-maintenance"
-      className="panel scroll-mt-24 overflow-hidden xl:col-start-2"
+      open={open}
+      onToggle={(event) => {
+        if (event.target === event.currentTarget)
+          onOpenChange(event.currentTarget.open);
+      }}
+      className="panel archive-disclosure scroll-mt-24 overflow-hidden"
     >
-      <div className="p-4 sm:p-5">
-        <div className="section-title">
-          <h2>Maintenance</h2>
-          <Button onClick={() => setModal({ type: "maintenance-add" })}>
-            <PlusIcon className="size-4" />
-            Add maintenance
-          </Button>
+      <summary className="flex cursor-pointer items-center justify-between gap-3 p-4 sm:p-5">
+        <div className="min-w-0">
+          <h2 className="font-display text-xl font-bold sm:text-2xl">
+            Maintenance expenses
+          </h2>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            {periodLabel} · {money(maintenanceTotal(expenses))} ·{" "}
+            {expenses.length} {expenses.length === 1 ? "entry" : "entries"}
+          </p>
         </div>
+        <ChevronDownIcon className="archive-chevron size-5 shrink-0 text-slate-500" />
+      </summary>
+      <div className="border-t border-slate-200 p-4 sm:px-5">
+        <Button onClick={() => setModal({ type: "maintenance-add" })}>
+          <PlusIcon className="size-4" />
+          Add maintenance
+        </Button>
       </div>
       <div className="border-t border-slate-200">
         {yearlyGroups.length ? (
@@ -180,11 +203,11 @@ export function MaintenanceArchive({
           <div className="p-5">
             <EmptyState
               title="No maintenance expenses"
-              text="Use Add maintenance to record the first expense."
+              text="Choose a wider period or use Add maintenance to record an expense."
             />
           </div>
         )}
       </div>
-    </article>
+    </details>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
+import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Button } from "../../components/ui/Button";
 import {
@@ -20,7 +21,13 @@ import {
 } from "../../components/workspace/SeatGrid";
 import type { ModalState, ViewId, WorkspaceData } from "../../types/domain";
 import { earningsForMonth } from "../../utils/earnings";
-import { localDate, money, monthLabel, prettyDate } from "../../utils/format";
+import {
+  isWithinLast30Days,
+  localDate,
+  money,
+  monthLabel,
+  prettyDate,
+} from "../../utils/format";
 import { memberStatus } from "../../utils/members";
 import { matchesSearch } from "../../utils/search";
 import {
@@ -76,7 +83,7 @@ function StatCard({
   );
 }
 
-type DashboardModal = "seats" | "dues" | "earnings" | null;
+type DashboardModal = "seats" | "dues" | "earnings" | "activity" | null;
 
 type DashboardActivity = {
   id: string;
@@ -87,6 +94,43 @@ type DashboardActivity = {
   when: string;
   paymentId?: string;
 };
+
+function ActivityItem({
+  activity,
+  openPayment,
+}: {
+  activity: DashboardActivity;
+  openPayment: (paymentId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={!activity.paymentId}
+      onClick={() => activity.paymentId && openPayment(activity.paymentId)}
+      className="flex w-full gap-3 rounded-2xl bg-slate-50 p-3.5 text-left transition enabled:hover:bg-slate-100 enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[var(--brand)] disabled:cursor-default"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-700 shadow-sm">
+        {activity.kind === "fee" ? (
+          <RupeeIcon className="size-5" />
+        ) : (
+          <CalendarIcon className="size-5" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <strong className="text-sm text-slate-900">{activity.title}</strong>
+        <p className="mt-0.5 text-xs text-slate-600">{activity.detail}</p>
+        <small className="text-[11px] font-semibold text-slate-400">
+          {activity.when}
+        </small>
+        {activity.paymentId && (
+          <small className="ml-2 text-[11px] font-extrabold text-[var(--brand)]">
+            View payment →
+          </small>
+        )}
+      </div>
+    </button>
+  );
+}
 
 const percentOf = (count: number, total: number) =>
   total ? Math.round((count / total) * 1000) / 10 : 0;
@@ -121,6 +165,7 @@ export function DashboardPage({
   openView: (view: ViewId) => void;
   openPayment: (paymentId: string) => void;
 }) {
+  const navigate = useNavigate();
   const [dashboardModal, setDashboardModal] = useState<DashboardModal>(null);
   const [dueSearch, setDueSearch] = useState("");
   const active = data.members.filter((member) => member.active);
@@ -247,24 +292,19 @@ export function DashboardPage({
       paymentId: fee.id,
     };
   });
-  const activities = [...attendanceActivities, ...paymentActivities]
-    .sort(
-      (first, second) =>
-        new Date(second.sortAt).getTime() - new Date(first.sortAt).getTime() ||
-        second.id.localeCompare(first.id),
-    )
-    .slice(0, 4);
-  const openEarningsSection = (id: string) => {
+  const allActivities = [...attendanceActivities, ...paymentActivities].sort(
+    (first, second) =>
+      new Date(second.sortAt).getTime() - new Date(first.sortAt).getTime() ||
+      second.id.localeCompare(first.id),
+  );
+  const activities = allActivities.slice(0, 4);
+  const now = new Date();
+  const recentActivities = allActivities.filter((activity) =>
+    isWithinLast30Days(activity.sortAt, now),
+  );
+  const openEarningsSection = (id: string, period = "this-month") => {
     setDashboardModal(null);
-    openView("fees");
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() =>
-        document.getElementById(id)?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-      ),
-    );
+    navigate(`/fees?${new URLSearchParams({ section: id, period })}`);
   };
   return (
     <>
@@ -341,43 +381,21 @@ export function DashboardPage({
         >
           <div className="section-title">
             <h2>Recent activity</h2>
+            <Button
+              variant="secondary"
+              onClick={() => setDashboardModal("activity")}
+            >
+              View all
+            </Button>
           </div>
           <div className="mt-5 grid gap-3">
             {activities.length ? (
               activities.map((activity) => (
-                <button
+                <ActivityItem
                   key={activity.id}
-                  type="button"
-                  disabled={!activity.paymentId}
-                  onClick={() =>
-                    activity.paymentId && openPayment(activity.paymentId)
-                  }
-                  className="flex w-full gap-3 rounded-2xl bg-slate-50 p-3.5 text-left transition enabled:hover:bg-slate-100 enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[var(--brand)] disabled:cursor-default"
-                >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-700 shadow-sm">
-                    {activity.kind === "fee" ? (
-                      <RupeeIcon className="size-5" />
-                    ) : (
-                      <CalendarIcon className="size-5" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <strong className="text-sm text-slate-900">
-                      {activity.title}
-                    </strong>
-                    <p className="mt-0.5 text-xs text-slate-600">
-                      {activity.detail}
-                    </p>
-                    <small className="text-[11px] font-semibold text-slate-400">
-                      {activity.when}
-                    </small>
-                    {activity.paymentId && (
-                      <small className="ml-2 text-[11px] font-extrabold text-[var(--brand)]">
-                        View payment →
-                      </small>
-                    )}
-                  </div>
-                </button>
+                  activity={activity}
+                  openPayment={openPayment}
+                />
               ))
             ) : (
               <EmptyState
@@ -386,6 +404,51 @@ export function DashboardPage({
               />
             )}
           </div>
+          {dashboardModal === "activity" && (
+            <Modal
+              onClose={() => setDashboardModal(null)}
+              labelledBy="recent-activity-title"
+              fixedLayout
+            >
+              <ModalHeader
+                eyebrow="Last 30 days"
+                title="Recent activity"
+                text={`${recentActivities.length} ${recentActivities.length === 1 ? "activity" : "activities"} · Newest first`}
+                id="recent-activity-title"
+                onClose={() => setDashboardModal(null)}
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-slate-200 py-4 pr-1">
+                <div className="grid gap-3">
+                  {recentActivities.length ? (
+                    recentActivities.map((activity) => (
+                      <ActivityItem
+                        key={activity.id}
+                        activity={activity}
+                        openPayment={(paymentId) => {
+                          setDashboardModal(null);
+                          openPayment(paymentId);
+                        }}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState
+                      title="No activity in the last 30 days"
+                      text="Check-ins, check-outs and payments will appear here."
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 border-t border-slate-200 pt-4">
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() => setDashboardModal(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            </Modal>
+          )}
         </section>
       </div>
       {dashboardModal === "seats" && (
@@ -476,11 +539,7 @@ export function DashboardPage({
                 monthlyEarnings.maintenancePaid,
                 "earnings-maintenance",
               ],
-              [
-                "Net earnings",
-                monthlyEarnings.netEarnings,
-                "earnings-maintenance",
-              ],
+              ["Net earnings", monthlyEarnings.netEarnings, "earnings-summary"],
             ].map(([label, value, target], index) => (
               <button
                 type="button"
@@ -543,8 +602,7 @@ export function DashboardPage({
             <Button
               variant="secondary"
               onClick={() => {
-                setDashboardModal(null);
-                openView("fees");
+                openEarningsSection("earnings-summary");
               }}
             >
               Go to earnings
@@ -618,8 +676,7 @@ export function DashboardPage({
             </Button>
             <Button
               onClick={() => {
-                setDashboardModal(null);
-                openView("fees");
+                openEarningsSection("fees-archive", "all");
               }}
             >
               View fee archive
